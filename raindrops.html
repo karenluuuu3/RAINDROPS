@@ -122,6 +122,50 @@
 
         let currentMode = 'full';
         
+        // Undo/Redo history
+        let history = [];
+        let historyIndex = -1;
+        const MAX_HISTORY = 50;
+
+        function saveState() {
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            let state;
+            // Deep copy to ensure objects are not referenced
+            if (currentMode === 'full') {
+                state = { mode: 'full', points: JSON.parse(JSON.stringify(globalPoints)) };
+            } else {
+                state = { mode: 'rect', rectangles: JSON.parse(JSON.stringify(rectangles)), selectedRectId: selectedRectId };
+            }
+            history.push(state);
+            if (history.length > MAX_HISTORY) {
+                history.shift();
+            }
+            historyIndex = history.length - 1;
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                const prevState = history[historyIndex];
+                // Restore state based on mode
+                if (prevState.mode === 'full') {
+                    currentMode = 'full';
+                    globalPoints = prevState.points;
+                    selectedRectId = null; // Ensure no rect is selected in full mode
+                } else { // prevState.mode === 'rect'
+                    currentMode = 'rect';
+                    rectangles = prevState.rectangles;
+                    selectedRectId = prevState.selectedRectId; // Restore selected rect ID
+                }
+                selectedPoint = null; // Deselect any point after undo
+                setMode(currentMode, false); // Do not save state again on undo
+                drawField();
+                updateControls(); // Update controls after restoring state
+            }
+        }
+        
         function initializeGlobalPoints() {
             pointIdCounter = 0; 
             globalPoints = [
@@ -221,26 +265,21 @@
                 for (let x = 0; x < w; x++) {
                     const idx = (y * w + x) * 4;
                     
-                    // Always calculate the full-canvas background gradient
                     const { gray: bgGray, alpha: bgAlpha } = calculateLinearGradientWithAlpha(globalPoints, x, y);
 
                     let finalGray, finalAlpha;
                     
-                    // Find if the current pixel is inside a modified rectangle
                     const rectHeight = h / RECT_COUNT;
                     const rectIndex = Math.floor(y / rectHeight);
                     const currentRect = rectangles[rectIndex];
 
-                    // If the rect has been modified (more than 2 points), use its gradient.
                     if (currentRect && currentRect.linearGradientPoints.length > 2) {
                         const { gray: rectGray, alpha: rectAlpha } = calculateLinearGradientWithAlpha(currentRect.linearGradientPoints, x, y);
                         
-                        // Blend the rectangle's gradient with the background
                         const blendFactor = rectAlpha / 255;
                         finalGray = rectGray * blendFactor + bgGray * (1 - blendFactor);
                         finalAlpha = rectAlpha + bgAlpha * (1 - blendFactor);
                     } else {
-                        // Otherwise, just use the background gradient
                         finalGray = bgGray;
                         finalAlpha = bgAlpha;
                     }
@@ -268,31 +307,44 @@
                         ctx.stroke();
                     }
                     pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
-                } else if (currentMode === 'rect' && selectedRectId !== null) {
-                    const selectedRect = rectangles.find(r => r.id === selectedRectId);
-                    if (selectedRect) {
-                        const rectX = Math.min(selectedRect.rectStart.x, selectedRect.rectEnd.x);
-                        const rectY = Math.min(selectedRect.rectStart.y, selectedRect.rectEnd.y);
-                        const rectW = Math.abs(selectedRect.rectEnd.x - selectedRect.rectStart.x);
-                        const rectH = Math.abs(selectedRect.rectEnd.y - selectedRect.rectStart.y);
-                        
-                        ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
-                        ctx.lineWidth = 2;
-                        ctx.strokeRect(rectX, rectY, rectW, rectH);
+                } else if (currentMode === 'rect') {
+                    // Draw rectangle numbers
+                    ctx.fillStyle = "white";
+                    ctx.font = "12px Arial";
+                    ctx.textAlign = "right";
+                    ctx.textBaseline = "middle";
+                    const rectHeight = h / RECT_COUNT;
+                    for (let i = 0; i < RECT_COUNT; i++) {
+                        const rectY = i * rectHeight;
+                        ctx.fillText(`${i + 1}`, 20, rectY + rectHeight / 2); // Increased x-offset for better visibility
+                    }
 
-                        pointsToDraw = selectedRect.linearGradientPoints;
-                        if (pointsToDraw.length > 1) {
-                            ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                    if (selectedRectId !== null) {
+                        const selectedRect = rectangles.find(r => r.id === selectedRectId);
+                        if (selectedRect) {
+                            const rectX = Math.min(selectedRect.rectStart.x, selectedRect.rectEnd.x);
+                            const rectY = Math.min(selectedRect.rectStart.y, selectedRect.rectEnd.y);
+                            const rectW = Math.abs(selectedRect.rectEnd.x - selectedRect.rectStart.x);
+                            const rectH = Math.abs(selectedRect.rectEnd.y - selectedRect.rectStart.y);
+                            
+                            ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
                             ctx.lineWidth = 2;
-                            ctx.beginPath();
-                            const sortedPointsForDrawing = pointsToDraw.slice().sort((a, b) => a.x - b.x);
-                            ctx.moveTo(sortedPointsForDrawing[0].x, sortedPointsForDrawing[0].y);
-                            for (let i = 1; i < sortedPointsForDrawing.length; i++) {
-                                ctx.lineTo(sortedPointsForDrawing[i].x, sortedPointsForDrawing[i].y);
+                            ctx.strokeRect(rectX, rectY, rectW, rectH);
+
+                            pointsToDraw = selectedRect.linearGradientPoints;
+                            if (pointsToDraw.length > 1) {
+                                ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                                ctx.lineWidth = 2;
+                                ctx.beginPath();
+                                const sortedPointsForDrawing = pointsToDraw.slice().sort((a, b) => a.x - b.x);
+                                ctx.moveTo(sortedPointsForDrawing[0].x, sortedPointsForDrawing[0].y);
+                                for (let i = 1; i < sortedPointsForDrawing.length; i++) {
+                                    ctx.lineTo(sortedPointsForDrawing[i].x, sortedPointsForDrawing[i].y);
+                                }
+                                ctx.stroke();
                             }
-                            ctx.stroke();
+                            pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
                         }
-                        pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
                     }
                 }
             }
@@ -315,7 +367,7 @@
                 createPointControl(selectedPoint, labelText);
             } else if (currentMode === 'rect' && selectedRectId !== null) {
                 if (selectedPoint) {
-                   createPointControl(selectedPoint, `區域 ${selectedRectId} 點 ${selectedPoint.id}`);
+                   createPointControl(selectedPoint, `區域 ${selectedRectId + 1} 點 ${selectedPoint.id}`); // Display 1-based index for rect
                 }
             }
         }
@@ -369,23 +421,29 @@
             controlsDiv.appendChild(wrapper);
         }
 
-        function setMode(mode) {
+        function setMode(mode, save = true) {
             currentMode = mode;
             fullCanvasModeBtn.classList.toggle('active', mode === 'full');
             rectModeBtn.classList.toggle('active', mode === 'rect');
 
             selectedPoint = null; 
-            selectedRectId = null;
-            
             if (mode === 'full') {
+                selectedRectId = null;
                 resetRectBtn.style.display = 'none';
                 document.querySelector('h3').textContent = '全畫布模式 (線性漸變)：左右兩點固定，僅可上下移動。左鍵點擊新增點，右鍵刪除中途點。';
             } else {
+                // Ensure selectedRectId is valid after mode switch, or set to null
+                if (selectedRectId !== null && !rectangles[selectedRectId]) {
+                    selectedRectId = null;
+                }
                 resetRectBtn.style.display = 'none';
                 document.querySelector('h3').textContent = '矩形模式：點擊一個區域以選取它，然後點擊區域內以新增或選取點，右鍵刪除非固定點。';
             }
             updateControls();
-            drawField(); 
+            drawField();
+            if (save) {
+                saveState();
+            }
         }
 
         saveBtn.addEventListener("click", () => {
@@ -423,15 +481,17 @@
                     }
                 }
 
-                if (e.button === 0) {
+                if (e.button === 0) { // Left click
                     if (foundPoint) {
                         draggingPoint = foundPoint;
                         selectedPoint = foundPoint;
                         canvas.style.cursor = "move";
                     } else {
-                        const newPoint = { x: mouseX, y: mouseY, gray: 128, alpha: 255, id: pointIdCounter++ };
+                        const { gray: newGray } = calculateLinearGradientWithAlpha(globalPoints, mouseX, mouseY);
+                        const newPoint = { x: mouseX, y: mouseY, gray: newGray, alpha: 255, id: pointIdCounter++ };
                         globalPoints.push(newPoint);
                         selectedPoint = newPoint;
+                        saveState(); 
                     }
                 }
                 
@@ -459,14 +519,18 @@
                         }
                     }
 
-                    if (foundPointToDrag) {
-                        draggingPoint = foundPointToDrag;
-                        selectedPoint = foundPointToDrag;
-                        canvas.style.cursor = "move";
-                    } else {
-                        const newPoint = { x: mouseX, y: rectPoints[0].y, gray: 128, alpha: 255, id: pointIdCounter++ };
-                        rectPoints.push(newPoint);
-                        selectedPoint = newPoint;
+                    if (e.button === 0) { // Left click
+                        if (foundPointToDrag) {
+                            draggingPoint = foundPointToDrag;
+                            selectedPoint = foundPointToDrag;
+                            canvas.style.cursor = "move";
+                        } else {
+                            const { gray: newGray } = calculateLinearGradientWithAlpha(globalPoints, mouseX, mouseY);
+                            const newPoint = { x: mouseX, y: rectPoints[0].y, gray: newGray, alpha: 255, id: pointIdCounter++ };
+                            rectPoints.push(newPoint);
+                            selectedPoint = newPoint;
+                            saveState(); 
+                        }
                     }
                     updateControls();
                     drawField();
@@ -487,13 +551,13 @@
             if (draggingPoint) {
                 didDrag = true;
                 if (currentMode === 'full') {
-                    if (draggingPoint.id === 0) {
+                    if (draggingPoint.id === 0) { // Left fixed point
                         draggingPoint.y = mouseY; 
                         draggingPoint.x = 0; 
-                    } else if (draggingPoint.id === 1) {
+                    } else if (draggingPoint.id === 1) { // Right fixed point
                         draggingPoint.y = mouseY; 
                         draggingPoint.x = w; 
-                    } else {
+                    } else { // Intermediate points
                         draggingPoint.x = mouseX;
                         draggingPoint.y = mouseY;
                     }
@@ -501,10 +565,11 @@
                     const selectedRect = rectangles.find(r => r.id === selectedRectId);
                     const isFixedPoint = selectedRect.linearGradientPoints.some(p => p.id === draggingPoint.id && (p.x === 0 || p.x === w));
                     
-                    if (!isFixedPoint) {
+                    if (!isFixedPoint) { // Only allow x-axis movement for non-fixed points
                         draggingPoint.x = Math.max(0, Math.min(mouseX, w));
                     }
-                    draggingPoint.y = selectedRect.linearGradientPoints[0].y;
+                    // Y-coordinate of rect points are fixed to the rect's mid-line
+                    draggingPoint.y = selectedRect.linearGradientPoints[0].y; 
                 } 
                 updateControls();
                 drawField();
@@ -512,16 +577,18 @@
         });
 
         canvas.addEventListener("mouseup", e => {
+            if (draggingPoint) {
+                if (didDrag) {
+                   saveState();
+                }
+            }
             draggingPoint = null;
             canvas.style.cursor = "crosshair";
-            if (didDrag) {
-                e.stopImmediatePropagation();
-                didDrag = false;
-            }
+            didDrag = false;
         });
 
         canvas.addEventListener("click", e => {
-            if (didDrag) {
+            if (didDrag) { // If it was a drag, don't treat as a click for selection
                 didDrag = false;
                 return;
             }
@@ -560,7 +627,7 @@
         });
 
         canvas.addEventListener("contextmenu", e => {
-            e.preventDefault();
+            e.preventDefault(); // Prevent default right-click menu
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
             const mouseY = e.clientY - rect.top;
@@ -569,11 +636,12 @@
                 for (let i = globalPoints.length - 1; i >= 0; i--) {
                     const p = globalPoints[i];
                     const dist = Math.sqrt((mouseX - p.x)**2 + (mouseY - p.y)**2);
-                    if (dist < 10 && p.id > 1) { 
+                    if (dist < 10 && p.id > 1) { // Only allow deleting intermediate points (id > 1)
                         globalPoints.splice(i, 1);
                         if (selectedPoint && selectedPoint.id === p.id) {
                             selectedPoint = null;
                         }
+                        saveState();
                         updateControls();
                         drawField();
                         return;
@@ -588,13 +656,15 @@
                         const p = rectPoints[i];
                         const dist = Math.sqrt((mouseX - p.x)**2 + (mouseY - p.y)**2);
                         
+                        // Check if it's a fixed point (x=0 or x=w)
                         const isFixedPoint = rectPoints.some(fp => fp.id === p.id && (fp.x === 0 || fp.x === w));
                         
-                        if (dist < 10 && !isFixedPoint) {
+                        if (dist < 10 && !isFixedPoint) { // Only delete non-fixed points
                             rectPoints.splice(i, 1);
                             if (selectedPoint && selectedPoint.id === p.id) {
                                 selectedPoint = null;
                             }
+                            saveState();
                             updateControls();
                             drawField();
                             return;
@@ -603,10 +673,17 @@
                 }
             }
         });
+
+        // 監聽鍵盤事件
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                undo();
+            }
+        });
         
         initializeGlobalPoints();
         initializeRectangles();
-        setMode('full');
+        setMode('full'); // This will save the initial state
     </script>
 </body>
 </html>
