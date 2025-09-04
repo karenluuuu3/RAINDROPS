@@ -117,11 +117,8 @@
         let pointIdCounter = 0;
 
         let rectangles = [];
-        let drawingRect = false;
-        let rectStart = null;
-        let currentRect = null;
+        const RECT_COUNT = 50;
         let selectedRectId = null;
-        let rectIdCounter = 0;
 
         let currentMode = 'full';
         
@@ -136,6 +133,26 @@
             }
         }
 
+        function initializeRectangles() {
+            if (rectangles.length === 0) {
+                const rectHeight = h / RECT_COUNT;
+                for (let i = 0; i < RECT_COUNT; i++) {
+                    const rectY = i * rectHeight;
+                    const rectMidY = rectY + rectHeight / 2;
+                    const newRectObj = {
+                        id: i,
+                        rectStart: { x: 0, y: rectY },
+                        rectEnd: { x: w, y: rectY + rectHeight },
+                        linearGradientPoints: [
+                            { x: 0, y: rectMidY, gray: 255, alpha: 255, id: pointIdCounter++ }, 
+                            { x: w, y: rectMidY, gray: 0, alpha: 255, id: pointIdCounter++ } 
+                        ]
+                    };
+                    rectangles.push(newRectObj);
+                }
+            }
+        }
+
         function calculateLinearGradientWithAlpha(points, x, y) {
             if (points.length === 0) {
                 return { gray: 0, alpha: 0 };
@@ -144,12 +161,12 @@
                 return { gray: points[0].gray, alpha: points[0].alpha };
             }
             
-            // 修正：針對矩形模式，漸變是基於水平距離
-            const pStartLine = points.slice().sort((a, b) => a.x - b.x)[0];
-            const pEndLine = points.slice().sort((a, b) => a.x - b.x)[points.length - 1];
+            const sortedByX = points.slice().sort((a, b) => a.x - b.x);
+            const pStartLine = sortedByX[0];
+            const pEndLine = sortedByX[sortedByX.length - 1];
 
             const dxLine = pEndLine.x - pStartLine.x;
-            const dyLine = 0; // 垂直距離為0，因為點都在水平線上
+            const dyLine = pEndLine.y - pStartLine.y;
             const lenSqLine = dxLine * dxLine + dyLine * dyLine;
             
             let t = 0;
@@ -157,35 +174,44 @@
                 t = ((x - pStartLine.x) * dxLine + (y - pStartLine.y) * dyLine) / lenSqLine;
             }
 
-            const sortedPoints = points.slice().sort((a, b) => a.x - b.x);
+            const sortedPoints = points.map(p => {
+                const p_t = lenSqLine > 0 ? (((p.x - pStartLine.x) * dxLine + (p.y - pStartLine.y) * dyLine) / lenSqLine) : (p.x / w);
+                return { ...p, t: p_t };
+            }).sort((a, b) => a.t - b.t);
 
             let gray, alpha;
 
-            if (t <= 0) {
+            if (t <= sortedPoints[0].t) {
                 gray = sortedPoints[0].gray;
                 alpha = sortedPoints[0].alpha;
             } 
-            else if (t >= 1) {
+            else if (t >= sortedPoints[sortedPoints.length - 1].t) {
                 gray = sortedPoints[sortedPoints.length - 1].gray;
                 alpha = sortedPoints[sortedPoints.length - 1].alpha;
             } 
             else {
+                let pA, pB;
                 for (let i = 0; i < sortedPoints.length - 1; i++) {
-                    const pA = sortedPoints[i];
-                    const pB = sortedPoints[i + 1];
+                    if (t >= sortedPoints[i].t && t <= sortedPoints[i + 1].t) {
+                        pA = sortedPoints[i];
+                        pB = sortedPoints[i + 1];
+                        
+                        const segmentLength = pB.t - pA.t;
+                        const localT = (segmentLength > 0) ? (t - pA.t) / segmentLength : 0;
 
-                    const localT = (x - pA.x) / (pB.x - pA.x);
-                    if (localT >= 0 && localT <= 1) {
                         gray = pA.gray * (1 - localT) + pB.gray * localT;
                         alpha = pA.alpha * (1 - localT) + pB.alpha * localT;
                         break;
                     }
                 }
+                if (typeof gray === 'undefined') { // Fallback for floating point inaccuracies
+                    gray = sortedPoints[sortedPoints.length - 1].gray;
+                    alpha = sortedPoints[sortedPoints.length - 1].alpha;
+                }
             }
             
             return { gray, alpha };
         }
-
 
         function drawField(isForSave = false) {
             let imgData = ctx.createImageData(w, h);
@@ -194,44 +220,29 @@
             for (let y = 0; y < h; y++) {
                 for (let x = 0; x < w; x++) {
                     const idx = (y * w + x) * 4;
+                    
+                    // Always calculate the full-canvas background gradient
+                    const { gray: bgGray, alpha: bgAlpha } = calculateLinearGradientWithAlpha(globalPoints, x, y);
+
                     let finalGray, finalAlpha;
                     
-                    let activeRect = null;
-                    if (currentMode === 'rect') {
-                        for (let i = rectangles.length - 1; i >= 0; i--) {
-                            const rectObj = rectangles[i];
-                            const rectX = Math.min(rectObj.rectStart.x, rectObj.rectEnd.x);
-                            const rectY = Math.min(rectObj.rectStart.y, rectObj.rectEnd.y);
-                            const rectW = Math.abs(rectObj.rectEnd.x - rectObj.rectStart.x);
-                            const rectH = Math.abs(rectObj.rectEnd.y - rectObj.rectStart.y);
+                    // Find if the current pixel is inside a modified rectangle
+                    const rectHeight = h / RECT_COUNT;
+                    const rectIndex = Math.floor(y / rectHeight);
+                    const currentRect = rectangles[rectIndex];
 
-                            if (x >= rectX && x < rectX + rectW && y >= rectY && y < rectY + rectH) {
-                                activeRect = rectObj;
-                                break; 
-                            }
-                        }
-                    }
-
-                    if (activeRect) {
-                        const { gray: rectGray, alpha: rectAlpha } = calculateLinearGradientWithAlpha(activeRect.linearGradientPoints, x, y);
-                        const { gray: bgGray, alpha: bgAlpha } = calculateLinearGradientWithAlpha(globalPoints, x, y);
+                    // If the rect has been modified (more than 2 points), use its gradient.
+                    if (currentRect && currentRect.linearGradientPoints.length > 2) {
+                        const { gray: rectGray, alpha: rectAlpha } = calculateLinearGradientWithAlpha(currentRect.linearGradientPoints, x, y);
                         
-                        const rectX = Math.min(activeRect.rectStart.x, activeRect.rectEnd.x);
-                        const rectW = Math.abs(activeRect.rectEnd.x - activeRect.rectStart.x);
-
-                        const smoothDist = activeRect.blendSmoothness;
-                        const distFromLeft = x - rectX;
-                        const distFromRight = (rectX + rectW) - x;
-
-                        const edgeBlendFactor = Math.min(1, distFromLeft / smoothDist, distFromRight / smoothDist);
-                        const finalBlendFactor = Math.max(0, Math.min(1, (rectAlpha / 255) * edgeBlendFactor));
-                        
-                        finalGray = bgGray * (1 - finalBlendFactor) + rectGray * finalBlendFactor;
-                        finalAlpha = bgAlpha; 
+                        // Blend the rectangle's gradient with the background
+                        const blendFactor = rectAlpha / 255;
+                        finalGray = rectGray * blendFactor + bgGray * (1 - blendFactor);
+                        finalAlpha = rectAlpha + bgAlpha * (1 - blendFactor);
                     } else {
-                        const { gray, alpha } = calculateLinearGradientWithAlpha(globalPoints, x, y);
-                        finalGray = gray;
-                        finalAlpha = alpha;
+                        // Otherwise, just use the background gradient
+                        finalGray = bgGray;
+                        finalAlpha = bgAlpha;
                     }
 
                     data[idx] = data[idx + 1] = data[idx + 2] = Math.max(0, Math.min(255, finalGray));
@@ -241,45 +252,34 @@
             ctx.putImageData(imgData, 0, 0);
 
             if (!isForSave) {
-                if (currentMode === 'full' && globalPoints.length > 1) {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    const pStartLine = globalPoints[0];
-                    const pEndLine = globalPoints[globalPoints.length - 1];
-                    const dxLine = pEndLine.x - pStartLine.x;
-                    const dyLine = pEndLine.y - pStartLine.y;
-                    const lenSqLine = dxLine * dxLine + dyLine * dyLine;
-
-                    const sortedPointsForDrawing = globalPoints.map(p => {
-                        const pt = ((p.x - pStartLine.x) * dxLine + (p.y - pStartLine.y) * dyLine) / lenSqLine;
-                        return { ...p, t: pt };
-                    }).sort((a, b) => a.t - b.t);
-
-                    ctx.moveTo(sortedPointsForDrawing[0].x, sortedPointsForDrawing[0].y);
-                    for (let i = 1; i < sortedPointsForDrawing.length; i++) {
-                        ctx.lineTo(sortedPointsForDrawing[i].x, sortedPointsForDrawing[i].y);
-                    }
-                    ctx.stroke();
-                }
-
-                rectangles.forEach(rectObj => {
-                    ctx.strokeStyle = (rectObj.id === selectedRectId) ? "rgba(255, 255, 0, 0.5)" : "rgba(0, 255, 0, 0.1)";
-                    ctx.lineWidth = 2;
-                    const rectX = Math.min(rectObj.rectStart.x, rectObj.rectEnd.x);
-                    const rectY = Math.min(rectObj.rectStart.y, rectObj.rectEnd.y);
-                    const rectW = Math.abs(rectObj.rectEnd.x - rectObj.rectStart.x);
-                    const rectH = Math.abs(rectObj.rectEnd.y - rectObj.rectStart.y);
-                    ctx.strokeRect(rectX, rectY, rectW, rectH);
-                });
-
                 let pointsToDraw = [];
+
                 if (currentMode === 'full') {
                     pointsToDraw = globalPoints;
+                    if (pointsToDraw.length > 1) {
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        const sortedByX = pointsToDraw.slice().sort((a,b)=>a.x-b.x);
+                        ctx.moveTo(sortedByX[0].x, sortedByX[0].y);
+                        for (let i = 1; i < sortedByX.length; i++) {
+                            ctx.lineTo(sortedByX[i].x, sortedByX[i].y);
+                        }
+                        ctx.stroke();
+                    }
                     pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
                 } else if (currentMode === 'rect' && selectedRectId !== null) {
                     const selectedRect = rectangles.find(r => r.id === selectedRectId);
                     if (selectedRect) {
+                        const rectX = Math.min(selectedRect.rectStart.x, selectedRect.rectEnd.x);
+                        const rectY = Math.min(selectedRect.rectStart.y, selectedRect.rectEnd.y);
+                        const rectW = Math.abs(selectedRect.rectEnd.x - selectedRect.rectStart.x);
+                        const rectH = Math.abs(selectedRect.rectEnd.y - selectedRect.rectStart.y);
+                        
+                        ctx.strokeStyle = "rgba(255, 255, 0, 0.5)";
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(rectX, rectY, rectW, rectH);
+
                         pointsToDraw = selectedRect.linearGradientPoints;
                         if (pointsToDraw.length > 1) {
                             ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
@@ -294,12 +294,6 @@
                         }
                         pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
                     }
-                }
-                
-                if (drawingRect && currentRect) {
-                    ctx.strokeStyle = "rgba(255, 255, 0, 0.7)";
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(currentRect.x, currentRect.y, currentRect.width, currentRect.height);
                 }
             }
         }
@@ -320,12 +314,8 @@
                 const labelText = `點 ${selectedPoint.id}`;
                 createPointControl(selectedPoint, labelText);
             } else if (currentMode === 'rect' && selectedRectId !== null) {
-                const selectedRect = rectangles.find(r => r.id === selectedRectId);
-                if (selectedRect) {
-                    createRectControls(selectedRect);
-                    if (selectedPoint) {
-                       createPointControl(selectedPoint, `矩形 ${selectedRectId} 點 ${selectedPoint.id}`);
-                    }
+                if (selectedPoint) {
+                   createPointControl(selectedPoint, `區域 ${selectedRectId} 點 ${selectedPoint.id}`);
                 }
             }
         }
@@ -379,47 +369,11 @@
             controlsDiv.appendChild(wrapper);
         }
 
-        function createRectControls(rect) {
-            const wrapper = document.createElement("div");
-            wrapper.className = "rect-control-group";
-            
-            const title = document.createElement("h4");
-            title.textContent = `矩形 ${rect.id} 屬性`;
-            wrapper.appendChild(title);
-
-            const smoothnessControl = document.createElement("div");
-            smoothnessControl.className = "point-control-row";
-            const smoothnessLabel = document.createElement("span");
-            smoothnessLabel.className = "point-label";
-            smoothnessLabel.textContent = "混合平滑度:";
-            const smoothnessSlider = document.createElement("input");
-            smoothnessSlider.type = "range";
-            smoothnessSlider.min = 0;
-            smoothnessSlider.max = 100;
-            smoothnessSlider.value = rect.blendSmoothness;
-            smoothnessSlider.oninput = () => {
-                rect.blendSmoothness = parseInt(smoothnessSlider.value);
-                drawField();
-            };
-            smoothnessControl.appendChild(smoothnessLabel);
-            smoothnessControl.appendChild(smoothnessSlider);
-            wrapper.appendChild(smoothnessControl);
-            
-            controlsDiv.appendChild(wrapper);
-
-            const pointsTitle = document.createElement("h4");
-            pointsTitle.textContent = "矩形內點屬性";
-            controlsDiv.appendChild(pointsTitle);
-        }
-
         function setMode(mode) {
             currentMode = mode;
             fullCanvasModeBtn.classList.toggle('active', mode === 'full');
             rectModeBtn.classList.toggle('active', mode === 'rect');
 
-            drawingRect = false;
-            rectStart = null;
-            currentRect = null;
             selectedPoint = null; 
             selectedRectId = null;
             
@@ -427,8 +381,8 @@
                 resetRectBtn.style.display = 'none';
                 document.querySelector('h3').textContent = '全畫布模式 (線性漸變)：左右兩點固定，僅可上下移動。左鍵點擊新增點，右鍵刪除中途點。';
             } else {
-                resetRectBtn.style.display = 'inline-block';
-                document.querySelector('h3').textContent = '矩形模式：拖曳以定義一個新矩形。點擊已建立的矩形以進入編輯模式，然後點擊矩形內以新增或選取點，右鍵刪除非固定點。';
+                resetRectBtn.style.display = 'none';
+                document.querySelector('h3').textContent = '矩形模式：點擊一個區域以選取它，然後點擊區域內以新增或選取點，右鍵刪除非固定點。';
             }
             updateControls();
             drawField(); 
@@ -442,23 +396,13 @@
             drawField();
         });
 
-        resetRectBtn.addEventListener("click", () => {
-            rectangles = [];
-            drawingRect = false;
-            rectStart = null;
-            currentRect = null;
-            selectedPoint = null;
-            selectedRectId = null;
-            updateControls();
-            drawField();
-        });
-
         fullCanvasModeBtn.addEventListener("click", () => {
-            initializeGlobalPoints();
             setMode('full');
         });
 
-        rectModeBtn.addEventListener("click", () => setMode('rect'));
+        rectModeBtn.addEventListener("click", () => {
+            setMode('rect');
+        });
         
         let didDrag = false;
 
@@ -485,7 +429,7 @@
                         selectedPoint = foundPoint;
                         canvas.style.cursor = "move";
                     } else {
-                        const newPoint = { x: mouseX, y: mouseY, gray: Math.floor(Math.random() * 256), alpha: 255, id: pointIdCounter++ };
+                        const newPoint = { x: mouseX, y: mouseY, gray: 128, alpha: 255, id: pointIdCounter++ };
                         globalPoints.push(newPoint);
                         selectedPoint = newPoint;
                     }
@@ -496,24 +440,14 @@
                 return;
             }
 
-            if (e.button === 0) {
-                let foundRectToSelect = null;
-                for (let i = rectangles.length - 1; i >= 0; i--) {
-                    const rectObj = rectangles[i];
-                    const minX = Math.min(rectObj.rectStart.x, rectObj.rectEnd.x);
-                    const maxX = Math.max(rectObj.rectStart.x, rectObj.rectEnd.x);
-                    const minY = Math.min(rectObj.rectStart.y, rectObj.rectEnd.y);
-                    const maxY = Math.max(rectObj.rectStart.y, rectObj.rectEnd.y);
+            if (currentMode === 'rect') {
+                const rectHeight = h / RECT_COUNT;
+                const rectIndex = Math.floor(mouseY / rectHeight);
+                const rectObj = rectangles[rectIndex];
 
-                    if (mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY) {
-                        foundRectToSelect = rectObj;
-                        break;
-                    }
-                }
-                
-                if (foundRectToSelect) {
-                    selectedRectId = foundRectToSelect.id;
-                    const rectPoints = foundRectToSelect.linearGradientPoints;
+                if (rectObj) {
+                    selectedRectId = rectObj.id;
+                    const rectPoints = rectObj.linearGradientPoints;
                     
                     let foundPointToDrag = null;
                     for (let i = 0; i < rectPoints.length; i++) {
@@ -530,7 +464,7 @@
                         selectedPoint = foundPointToDrag;
                         canvas.style.cursor = "move";
                     } else {
-                        const newPoint = { x: mouseX, y: rectPoints[0].y, gray: Math.floor(Math.random() * 256), alpha: 255, id: pointIdCounter++ };
+                        const newPoint = { x: mouseX, y: rectPoints[0].y, gray: 128, alpha: 255, id: pointIdCounter++ };
                         rectPoints.push(newPoint);
                         selectedPoint = newPoint;
                     }
@@ -540,10 +474,7 @@
                     selectedRectId = null;
                     selectedPoint = null;
                     updateControls();
-                    if (!drawingRect) {
-                        rectStart = { x: mouseX, y: mouseY };
-                        drawingRect = true;
-                    }
+                    drawField();
                 }
             }
         });
@@ -568,66 +499,19 @@
                     }
                 } else if (currentMode === 'rect' && selectedRectId !== null) {
                     const selectedRect = rectangles.find(r => r.id === selectedRectId);
-                    const rectPoints = selectedRect.linearGradientPoints;
-                    const isFixedPoint = rectPoints.findIndex(p => p.id === draggingPoint.id) <= 1;
+                    const isFixedPoint = selectedRect.linearGradientPoints.some(p => p.id === draggingPoint.id && (p.x === 0 || p.x === w));
                     
                     if (!isFixedPoint) {
-                        const minX = Math.min(selectedRect.rectStart.x, selectedRect.rectEnd.x);
-                        const maxX = Math.max(selectedRect.rectStart.x, selectedRect.rectEnd.x);
-                        draggingPoint.x = Math.max(minX, Math.min(mouseX, maxX));
+                        draggingPoint.x = Math.max(0, Math.min(mouseX, w));
                     }
+                    draggingPoint.y = selectedRect.linearGradientPoints[0].y;
                 } 
                 updateControls();
-                drawField();
-            } else if (currentMode === 'rect' && drawingRect && rectStart) {
-                didDrag = true;
-                currentRect = {
-                    x: Math.min(rectStart.x, mouseX),
-                    y: Math.min(rectStart.y, mouseY),
-                    width: Math.abs(mouseX - rectStart.x),
-                    height: Math.abs(mouseY - rectStart.y)
-                };
                 drawField();
             }
         });
 
         canvas.addEventListener("mouseup", e => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            if (currentMode === 'rect' && drawingRect) {
-                const newRectObj = {
-                    id: rectIdCounter++,
-                    rectStart,
-                    rectEnd: { x: mouseX, y: mouseY },
-                    linearGradientPoints: [],
-                    blendSmoothness: 50
-                };
-
-                const newWidth = Math.abs(newRectObj.rectEnd.x - newRectObj.rectStart.x);
-                const newHeight = Math.abs(newRectObj.rectEnd.y - newRectObj.rectStart.y);
-
-                if (newWidth < 10 || newHeight < 10) {
-                    alert("繪製的矩形太小，請重試。");
-                    rectStart = null;
-                    currentRect = null;
-                } else {
-                    const rectMinX = Math.min(newRectObj.rectStart.x, newRectObj.rectEnd.x);
-                    const rectMaxX = Math.max(newRectObj.rectStart.x, newRectObj.rectEnd.x);
-                    const rectMidY = (newRectObj.rectStart.y + newRectObj.rectEnd.y) / 2;
-
-                    newRectObj.linearGradientPoints.push(
-                        { x: rectMinX, y: rectMidY, gray: 255, alpha: 255, id: pointIdCounter++ }, 
-                        { x: rectMaxX, y: rectMidY, gray: 0, alpha: 255, id: pointIdCounter++ } 
-                    );
-                    rectangles.push(newRectObj);
-                    selectedRectId = newRectObj.id;
-                }
-                drawingRect = false;
-                updateControls();
-                drawField();
-            }
             draggingPoint = null;
             canvas.style.cursor = "crosshair";
             if (didDrag) {
@@ -651,11 +535,7 @@
                         break;
                     }
                 }
-                if (foundPoint) {
-                    selectedPoint = foundPoint;
-                } else {
-                    selectedPoint = null;
-                }
+                selectedPoint = foundPoint; 
                 updateControls();
                 drawField();
                 return;
@@ -664,19 +544,16 @@
             if (currentMode === 'rect' && selectedRectId !== null) {
                 const selectedRect = rectangles.find(r => r.id === selectedRectId);
                 const rectPoints = selectedRect.linearGradientPoints;
-                let foundPoint = false;
+                let foundPoint = null;
                 for (let i = 0; i < rectPoints.length; i++) {
                     const p = rectPoints[i];
                     const dist = Math.sqrt((e.offsetX - p.x) ** 2 + (e.offsetY - p.y) ** 2);
                     if (dist < 10) {
-                        selectedPoint = p;
-                        foundPoint = true;
+                        foundPoint = p;
                         break;
                     }
                 }
-                if (!foundPoint) {
-                    selectedPoint = null;
-                }
+                selectedPoint = foundPoint; 
                 updateControls();
                 drawField();
             }
@@ -692,9 +569,11 @@
                 for (let i = globalPoints.length - 1; i >= 0; i--) {
                     const p = globalPoints[i];
                     const dist = Math.sqrt((mouseX - p.x)**2 + (mouseY - p.y)**2);
-                    if (dist < 10 && p.id > 1) {
+                    if (dist < 10 && p.id > 1) { 
                         globalPoints.splice(i, 1);
-                        selectedPoint = null;
+                        if (selectedPoint && selectedPoint.id === p.id) {
+                            selectedPoint = null;
+                        }
                         updateControls();
                         drawField();
                         return;
@@ -704,49 +583,29 @@
                 if (selectedRectId !== null) {
                     const selectedRect = rectangles.find(r => r.id === selectedRectId);
                     const rectPoints = selectedRect.linearGradientPoints;
-                    const minX = Math.min(selectedRect.rectStart.x, selectedRect.rectEnd.x);
-                    const maxX = Math.max(selectedRect.rectStart.x, selectedRect.rectEnd.x);
-                    const minY = Math.min(selectedRect.rectStart.y, selectedRect.rectEnd.y);
-                    const maxY = Math.max(selectedRect.rectStart.y, selectedRect.rectEnd.y);
-
-                    if (mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY) {
-                        for (let i = rectPoints.length - 1; i >= 0; i--) {
-                            const p = rectPoints[i];
-                            const dist = Math.sqrt((mouseX - p.x)**2 + (mouseY - p.y)**2);
-                            
-                            // 修正：檢查是否為固定點
-                            const isFixedPoint = (p.x === minX || p.x === maxX) && (p.y === (minY + maxY) / 2);
-                            
-                            if (dist < 10 && !isFixedPoint) {
-                                rectPoints.splice(i, 1);
-                                selectedPoint = null;
-                                updateControls();
-                                drawField();
-                                return;
-                            }
-                        }
-                    }
-                }
-                
-                for (let i = rectangles.length - 1; i >= 0; i--) {
-                    const rectObj = rectangles[i];
-                    const minX = Math.min(rectObj.rectStart.x, rectObj.rectEnd.x);
-                    const maxX = Math.max(rectObj.rectStart.x, rectObj.rectEnd.x);
-                    const minY = Math.min(rectObj.rectStart.y, rectObj.rectEnd.y);
-                    const maxY = Math.max(rectObj.rectStart.y, rectObj.rectEnd.y);
                     
-                    if (mouseX >= minX && mouseX <= maxX && mouseY >= minY && mouseY <= maxY) {
-                        rectangles.splice(i, 1);
-                        selectedRectId = null;
-                        updateControls();
-                        drawField();
-                        return;
+                    for (let i = rectPoints.length - 1; i >= 0; i--) {
+                        const p = rectPoints[i];
+                        const dist = Math.sqrt((mouseX - p.x)**2 + (mouseY - p.y)**2);
+                        
+                        const isFixedPoint = rectPoints.some(fp => fp.id === p.id && (fp.x === 0 || fp.x === w));
+                        
+                        if (dist < 10 && !isFixedPoint) {
+                            rectPoints.splice(i, 1);
+                            if (selectedPoint && selectedPoint.id === p.id) {
+                                selectedPoint = null;
+                            }
+                            updateControls();
+                            drawField();
+                            return;
+                        }
                     }
                 }
             }
         });
         
         initializeGlobalPoints();
+        initializeRectangles();
         setMode('full');
     </script>
 </body>
