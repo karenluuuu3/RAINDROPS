@@ -341,10 +341,10 @@
 
             if (!isForSave) {
                 let pointsToDraw = [];
-                if (currentMode === 'full') {
+                if (currentMode === 'full') { 
                     pointsToDraw = globalPoints;
                     if (pointsToDraw.length > 1) {
-                        ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
+                        ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                         ctx.lineWidth = 2;
                         ctx.beginPath();
                         const sortedByX = pointsToDraw.slice().sort((a, b) => a.x - b.x);
@@ -354,7 +354,7 @@
                         }
                         ctx.stroke();
                     }
-                    pointsToDraw.forEach(p => drawPoint(p, (draggingPoint && draggingPoint.id === p.id)));
+                    globalPoints.forEach(p => drawPoint(p, draggingPoint && draggingPoint.id === p.id));
                 } else if (currentMode === 'rect') {
                     ctx.fillStyle = "white";
                     ctx.font = "12px Arial";
@@ -542,56 +542,52 @@
                 canvas.width = w;
                 canvas.height = h;
 
-                // 調整全畫布模式的點
+                // 全畫布模式
                 globalPoints.forEach(p => {
-                    // Y座標按比例縮放
-                    p.y = (p.y / oldH) * newHeight;
-                    
-                    // 檢查是否是端點 (由於浮點數計算，用一個小容差來判斷)
-                    const isLeftEndPoint = (Math.abs(p.x - 0) < 0.01);
-                    const isRightEndPoint = (Math.abs(p.x - oldW) < 0.01);
-                    
-                    if (isLeftEndPoint) {
-                        p.x = 0;
-                    } else if (isRightEndPoint) {
-                        p.x = newLongWidth;
-                    }
-                    // 中間的點保持原X座標
+                    p.y = (p.y / oldH) * h;
+
+                    if (p.id === 0) p.x = 0;        // 左端點 id=0
+                    if (p.id === 1) p.x = w;        // 右端點 id=1
                 });
-                
-                // 檢查新的右端點是否存在，如果沒有就新增
-                if (!globalPoints.find(p => Math.abs(p.x - w) < 0.01)) {
-                    globalPoints.push({ x: w, y: h / 2, gray: 0, alpha: 255, id: pointIdCounter++ });
+
+                // 如果 globalPoints 失誤沒有右端點，強制新增
+                if (!globalPoints.find(p => p.id === 1)) {
+                    globalPoints.push({ x: w, y: h / 2, gray: 0, alpha: 255, id: 1 });
                 }
 
                 // 調整矩形模式下的點
                 const oldRectHeight = oldH / RECT_COUNT;
                 const newRectHeight = h / RECT_COUNT;
                 rectangles.forEach(rect => {
-                    rect.rectStart.x = 0;
-                    rect.rectStart.y = rect.rectStart.y * (newHeight / oldH);
-                    rect.rectEnd.x = w;
-                    rect.rectEnd.y = rect.rectEnd.y * (newHeight / oldH);
-                    
                     const newMidY = rect.rectStart.y + newRectHeight / 2;
-                    
-                    rect.linearGradientPoints.forEach(p => {
-                        p.y = newMidY;
-                        
-                        const isLeftEndPoint = (Math.abs(p.x - 0) < 0.01);
-                        const isRightEndPoint = (Math.abs(p.x - oldW) < 0.01);
-                        
-                        if (isLeftEndPoint) {
-                            p.x = 0;
-                        } else if (isRightEndPoint) {
-                            p.x = newLongWidth;
-                        }
-                        // 中間的點保持原X座標
-                    });
-                     if (!rect.linearGradientPoints.find(p => Math.abs(p.x - w) < 0.01)) {
-                        rect.linearGradientPoints.push({ x: w, y: newMidY, gray: 0, alpha: 255, id: pointIdCounter++ });
+
+                    let leftEnd = rect.linearGradientPoints.find(p => p.id === 0);
+                    let rightEnd = rect.linearGradientPoints.find(p => p.id === 1);
+
+                    if (!leftEnd) {
+                        leftEnd = { x: 0, y: newMidY, gray: 255, alpha: 255, id: 0 };
+                        rect.linearGradientPoints.push(leftEnd);
+                    } else {
+                        leftEnd.x = 0;
+                        leftEnd.y = newMidY;
                     }
+
+                    if (!rightEnd) {
+                        rightEnd = { x: w, y: newMidY, gray: 0, alpha: 255, id: 1 };
+                        rect.linearGradientPoints.push(rightEnd);
+                    } else {
+                        rightEnd.x = w;
+                        rightEnd.y = newMidY;
+                    }
+
+                    // 中間點保持原來的 X
+                    rect.linearGradientPoints.forEach(p => {
+                        if (p.id !== 0 && p.id !== 1) {
+                            p.y = newMidY;
+                        }
+                    });
                 });
+
                 
                 setMode(currentMode);
                 drawField();
