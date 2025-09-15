@@ -137,9 +137,28 @@
         <button id="update-canvas-btn">更新畫布</button>
     </div>
 
-    <div class="canvas-container">
-        <canvas id="canvas" width="1280" height="720"></canvas>
+
+
+
+
+    <div style="display: flex; align-items: flex-start;">
+        <!-- 左側編號 -->
+        <div id="left-labels" style="width: 40px; text-align: right; color: white;"></div>
+
+        <!-- Canvas 容器 -->
+        <div class="canvas-container">
+            <canvas id="canvas" width="1280" height="720"></canvas>
+        </div>
+
+        <!-- 右側編號 -->
+        <div id="right-labels" style="width: 40px; color: white;"></div>
     </div>
+
+
+
+
+
+
     <a id="save-btn" href="#">儲存圖片</a>
     <button id="reset-rect-btn" style="display: none;">重設所有矩形</button>
 
@@ -358,13 +377,8 @@
                 } else if (currentMode === 'rect') {
                     ctx.fillStyle = "white";
                     ctx.font = "12px Arial";
-                    ctx.textAlign = "right";
                     ctx.textBaseline = "middle";
-                    const rectHeight = h / RECT_COUNT;
-                    for (let i = 0; i < RECT_COUNT; i++) {
-                        const rectY = i * rectHeight;
-                        ctx.fillText(`${i + 1}`, 20, rectY + rectHeight / 2);
-                    }
+                    const rectHeight = h / RECT_COUNT;// RECT_COUNT = 50
 
                     if (selectedRectId !== null) {
                         const selectedRect = rectangles.find(r => r.id === selectedRectId);
@@ -495,6 +509,30 @@
             }
         }
 
+
+        function createSideLabels() {
+            const leftDiv = document.getElementById('left-labels');
+            const rightDiv = document.getElementById('right-labels');
+            leftDiv.innerHTML = '';
+            rightDiv.innerHTML = '';
+
+            const rectHeight = h / RECT_COUNT;
+
+            for (let i = 0; i < RECT_COUNT; i++) {
+                const label = document.createElement('div');
+                label.style.height = rectHeight + 'px';
+                label.style.lineHeight = rectHeight + 'px';
+                label.style.fontSize = '14px';
+                label.textContent = i + 1;
+                leftDiv.appendChild(label);
+
+                const rightLabel = label.cloneNode(true);
+                rightDiv.appendChild(rightLabel);
+            }
+        }
+
+        
+
         let isDraggingCanvas = false;
         let lastX = 0;
         let lastScrollLeft = 0;
@@ -533,7 +571,7 @@
             if (newLongWidth !== w || newHeight !== h) {
                 const oldW = w;
                 const oldH = h;
-                
+
                 // 更新畫布尺寸
                 w = newLongWidth;
                 h = newHeight;
@@ -542,45 +580,43 @@
                 canvas.width = w;
                 canvas.height = h;
 
-                // 全畫布模式
-                globalPoints.forEach(p => {
-                    p.y = (p.y / oldH) * h;
+                // 更新全畫布端點，只改 Y 值和 X 端點位置，不重置中間點
+                const leftEnd = globalPoints.find(p => p.id === 0) || { id: 0 };
+                const rightEnd = globalPoints.find(p => p.id === 1) || { id: 1 };
+                const midY = h / 2;
 
-                    if (p.id === 0) p.x = 0;        // 左端點 id=0
-                    if (p.id === 1) p.x = w;        // 右端點 id=1
-                });
+                leftEnd.x = 0;
+                leftEnd.y = midY;
+                leftEnd.gray = 255;
+                leftEnd.alpha = 255;
 
-                // 如果 globalPoints 失誤沒有右端點，強制新增
-                if (!globalPoints.find(p => p.id === 1)) {
-                    globalPoints.push({ x: w, y: h / 2, gray: 0, alpha: 255, id: 1 });
-                }
+                rightEnd.x = w;
+                rightEnd.y = midY;
+                rightEnd.gray = 0;
+                rightEnd.alpha = 255;
+
+                if (!globalPoints.includes(leftEnd)) globalPoints.push(leftEnd);
+                if (!globalPoints.includes(rightEnd)) globalPoints.push(rightEnd);
+
 
                 // 調整矩形模式下的點
-                const oldRectHeight = oldH / RECT_COUNT;
                 const newRectHeight = h / RECT_COUNT;
                 rectangles.forEach(rect => {
                     const newMidY = rect.rectStart.y + newRectHeight / 2;
 
-                    let leftEnd = rect.linearGradientPoints.find(p => p.id === 0);
-                    let rightEnd = rect.linearGradientPoints.find(p => p.id === 1);
+                    const leftEnd = rect.linearGradientPoints.find(p => p.id === 0);
+                    const rightEnd = rect.linearGradientPoints.find(p => p.id === 1);
 
-                    if (!leftEnd) {
-                        leftEnd = { x: 0, y: newMidY, gray: 255, alpha: 255, id: 0 };
-                        rect.linearGradientPoints.push(leftEnd);
-                    } else {
+                    if (leftEnd) {
                         leftEnd.x = 0;
                         leftEnd.y = newMidY;
                     }
-
-                    if (!rightEnd) {
-                        rightEnd = { x: w, y: newMidY, gray: 0, alpha: 255, id: 1 };
-                        rect.linearGradientPoints.push(rightEnd);
-                    } else {
+                    if (rightEnd) {
                         rightEnd.x = w;
                         rightEnd.y = newMidY;
                     }
 
-                    // 中間點保持原來的 X
+                    // 中間點只更新 Y 值，保留 X 值
                     rect.linearGradientPoints.forEach(p => {
                         if (p.id !== 0 && p.id !== 1) {
                             p.y = newMidY;
@@ -588,11 +624,13 @@
                     });
                 });
 
-                
-                setMode(currentMode);
+                // 刷新畫面，但不重置模式或存檔
+                setMode(currentMode, false);
                 drawField();
+                createSideLabels();
             }
         });
+
 
         saveBtn.addEventListener("click", () => {
             drawField(true);
@@ -838,7 +876,9 @@
         initializeGlobalPoints();
         initializeRectangles();
         setMode('full', false);
+        createSideLabels();
         saveState();
+
 
     </script>
 </body>
