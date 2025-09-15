@@ -256,7 +256,7 @@
         function calculateLinearGradientWithAlpha(points, x, y) {
             if (points.length === 0) return { gray: 0, alpha: 0 };
             if (points.length === 1) return { gray: points[0].gray, alpha: points[0].alpha };
-
+            
             const sortedByX = points.slice().sort((a, b) => a.x - b.x);
             const pStartLine = sortedByX[0];
             const pEndLine = sortedByX[sortedByX.length - 1];
@@ -430,53 +430,8 @@
 
             const label = document.createElement("span");
             label.className = "point-label";
-            // 保持這裡的 label 可以顯示座標，但下方不顯示輸入框
             label.textContent = `${labelText} (${Math.floor(p.x)},${Math.floor(p.y)})`; 
             wrapper.appendChild(label);
-
-            // 以下是移除 X 座標和 Y 座標輸入框的部分
-
-            // const xRow = document.createElement("div");
-            // xRow.className = "point-control-row";
-            // const xLabel = document.createElement("span");
-            // xLabel.textContent = "X 座標:";
-            // const xInput = document.createElement("input");
-            // xInput.type = "number";
-            // xInput.min = 0;
-            // xInput.max = w;
-            // xInput.value = Math.floor(p.x);
-            // xInput.onchange = () => {
-            //     const isFixed = (currentMode === 'full' && (Math.abs(p.x - 0) < 0.01 || Math.abs(p.x - w) < 0.01));
-            //     if (isFixed) {
-            //         alert('固定點的X座標無法手動更改。');
-            //         xInput.value = p.x;
-            //         return;
-            //     }
-            //     p.x = parseInt(xInput.value);
-            //     drawField();
-            //     saveState();
-            // };
-            // xRow.appendChild(xLabel);
-            // xRow.appendChild(xInput);
-            // wrapper.appendChild(xRow);
-
-            // const yRow = document.createElement("div");
-            // yRow.className = "point-control-row";
-            // const yLabel = document.createElement("span");
-            // yLabel.textContent = "Y 座標:";
-            // const yInput = document.createElement("input");
-            // yInput.type = "number";
-            // yInput.min = 0;
-            // yInput.max = h;
-            // yInput.value = Math.floor(p.y);
-            // yInput.onchange = () => {
-            //     p.y = parseInt(yInput.value);
-            //     drawField();
-            //     saveState();
-            // };
-            // yRow.appendChild(yLabel);
-            // yRow.appendChild(yInput);
-            // wrapper.appendChild(yRow);
 
             const grayRow = document.createElement("div");
             grayRow.className = "point-control-row";
@@ -691,7 +646,7 @@
                         canvas.style.cursor = "move";
                     } else {
                         const { gray: newGray, alpha: newAlpha } = calculateLinearGradientWithAlpha(globalPoints, mouseX, mouseY);
-                        const newPoint = { x: mouseX, y: mouseY, gray: newGray, alpha: newAlpha, id: pointIdCounter++ };
+                        const newPoint = { x: mouseX, y: mouseY, gray: newGray, alpha: 255, id: pointIdCounter++ };
                         globalPoints.push(newPoint);
                         selectedPoint = newPoint;
                         saveState();
@@ -728,7 +683,7 @@
                             canvas.style.cursor = "move";
                         } else {
                             const { gray: newGray, alpha: newAlpha } = calculateLinearGradientWithAlpha(globalPoints, mouseX, mouseY);
-                            const newPoint = { x: mouseX, y: rectPoints[0].y, gray: newGray, alpha: newAlpha, id: pointIdCounter++ };
+                            const newPoint = { x: mouseX, y: rectPoints[0].y, gray: newGray, alpha: 255, id: pointIdCounter++ };
                             rectPoints.push(newPoint);
                             selectedPoint = newPoint;
                             saveState();
