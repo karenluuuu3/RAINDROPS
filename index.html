@@ -756,7 +756,6 @@
             } else if (currentMode === 'rect') {
                 const rectIndex = Math.floor(y / (h / RECT_COUNT));
                 if (rectangles[rectIndex]) {
-                    // When in rect mode, always select the rect under the cursor
                     selectedRectId = rectIndex;
                     pointsToSearch = rectangles[rectIndex].points;
                 }
