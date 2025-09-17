@@ -217,6 +217,10 @@
         let isDraggingCanvas = false;
         let lastDragX = 0;
 
+        // --- NEW STATE FOR TEMPORARY POINTS ---
+        let temporaryPoint = null;
+        let tempPointAssociatedRectId = null; 
+
         // ---- State Management ----
         function saveState() {
             if (historyIndex < history.length - 1) {
@@ -244,6 +248,24 @@
                 requestDraw();
                 updateControls();
             }
+        }
+
+        // --- NEW HELPER FUNCTION TO COMMIT POINTS ---
+        function commitTemporaryPoint() {
+            if (!temporaryPoint) return;
+
+            if (currentMode === 'full') {
+                globalPoints.push(temporaryPoint);
+            } else if (currentMode === 'rect' && tempPointAssociatedRectId !== null) {
+                const rect = rectangles[tempPointAssociatedRectId];
+                if (rect) {
+                    rect.points.push(temporaryPoint);
+                }
+            }
+            
+            saveState();
+            temporaryPoint = null;
+            tempPointAssociatedRectId = null;
         }
 
         // ---- Initialization ----
@@ -299,10 +321,8 @@
 
             ctx.clearRect(0, 0, w, h);
             
-            // 1. Draw background gradient
             drawNativeGradient(globalPoints, { x: 0, y: 0, w, h });
 
-            // 2. Draw rectangle gradients on top
             rectangles.forEach(rect => {
                 const hasEffect = rect.points.some(p => p.alpha > 0);
                 if (rect.points.length > 2 || hasEffect) {
@@ -310,7 +330,6 @@
                 }
             });
 
-            // 3. Draw UI elements (points, lines, selections)
             if (typeof window.drawUI === 'function') {
                 window.drawUI();
             }
@@ -346,12 +365,21 @@
             ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
         }
         
+        // --- MODIFIED drawUI ---
         window.drawUI = function() {
-            const pointsToDraw = (currentMode === 'full') 
-                ? globalPoints 
-                : (selectedRectId !== null ? rectangles[selectedRectId]?.points : []);
+            let pointsToDraw = (currentMode === 'full') 
+                ? [...globalPoints] 
+                : (selectedRectId !== null ? [...rectangles[selectedRectId]?.points] : []);
 
-            // Draw connector line (no changes here)
+            // If a temporary point exists, add it to the list of points to be rendered.
+            if (temporaryPoint) {
+                if (currentMode === 'full') {
+                    pointsToDraw.push(temporaryPoint);
+                } else if (currentMode === 'rect' && selectedRectId === tempPointAssociatedRectId) {
+                    pointsToDraw.push(temporaryPoint);
+                }
+            }
+            
             if (pointsToDraw.length > 1) {
                 ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
                 ctx.lineWidth = 2;
@@ -364,14 +392,12 @@
                 ctx.stroke();
             }
 
-            // Draw points
             pointsToDraw.forEach(p => {
                 const isSelected = selectedPoint && selectedPoint.id === p.id;
 
                 if (currentMode === 'rect' && selectedRectId !== null) {
                     const rect = rectangles[selectedRectId];
                     if (rect) {
-                        // Draw the vertical line through the rectangle
                         ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
                         ctx.lineWidth = 1;
                         ctx.beginPath();
@@ -381,13 +407,11 @@
                     }
                 }
 
-                // Draw the circle itself
                 ctx.fillStyle = `rgb(${p.gray}, ${p.gray}, ${p.gray})`;
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Draw the circle's border (white, or red if selected)
                 ctx.strokeStyle = isSelected ? "red" : "#FFF";
                 ctx.lineWidth = isSelected ? 2 : 1;
                 ctx.stroke();
@@ -395,12 +419,18 @@
         }
 
         // ---- UI Updates ----
+        // --- MODIFIED updateControls ---
         function updateControls() {
             const pointsToUse = (currentMode === 'full') 
                 ? globalPoints 
                 : (selectedRectId !== null ? rectangles[selectedRectId]?.points : null);
 
-            if (!selectedPoint || !pointsToUse || !pointsToUse.find(p => p.id === selectedPoint.id)) {
+            let pointIsVisible = selectedPoint && (
+                (temporaryPoint && selectedPoint.id === temporaryPoint.id) || 
+                (pointsToUse && pointsToUse.find(p => p.id === selectedPoint.id))
+            );
+
+            if (!pointIsVisible) {
                 controlsDiv.innerHTML = '';
                 return;
             }
@@ -430,7 +460,13 @@
                     p[slider.dataset.prop] = parseInt(slider.value);
                     requestDraw();
                 };
-                slider.onchange = () => saveState();
+                slider.onchange = () => {
+                    if (temporaryPoint && selectedPoint && selectedPoint.id === temporaryPoint.id) {
+                        commitTemporaryPoint();
+                    } else {
+                        saveState();
+                    }
+                };
             });
 
             controlsDiv.replaceChildren(controlWrapper);
@@ -490,41 +526,47 @@
                 }
             });
         }
-
+        
+        // --- MODIFIED handleMouseDown ---
         function handleMouseDown(e) {
             if (e.button !== 0) return;
             const { x, y } = getMouseCoords(e);
             didDrag = false;
 
             const pointToDrag = getPointAtCoords(x, y);
+
+            if (temporaryPoint && pointToDrag?.id !== temporaryPoint.id) {
+                temporaryPoint = null;
+                tempPointAssociatedRectId = null;
+            }
+
             if (pointToDrag) {
                 draggingPoint = pointToDrag;
                 selectedPoint = pointToDrag;
                 canvas.style.cursor = "move";
             } else {
-                // Read the color of the pixel at the click location to use as the new point's default color.
                 const pixelData = ctx.getImageData(x, y, 1, 1).data;
-                const newGrayValue = pixelData[0]; // For grayscale, R, G, and B are the same.
+                const newGrayValue = pixelData[0];
+                let newPoint;
 
                 if (currentMode === 'full') {
-                    // Use the read color instead of a hardcoded gray value.
-                    const newPoint = { x, y, gray: 0, alpha: 0, id: pointIdCounter++ };
-                    globalPoints.push(newPoint);
-                    selectedPoint = newPoint;
-                    draggingPoint = newPoint;
-                    saveState();
+                    newPoint = { x, y, gray: newGrayValue, alpha: 255, id: pointIdCounter++ };
+                    tempPointAssociatedRectId = null;
                 } else if (currentMode === 'rect') {
                     const rectIndex = Math.floor(y / (h / RECT_COUNT));
                     if (rectangles[rectIndex]) {
                         selectedRectId = rectIndex;
                         const rectMidY = rectangles[rectIndex].y + rectangles[rectIndex].height / 2;
-                        // Use the read color instead of a hardcoded gray value.
-                        const newPoint = { x, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ };
-                        rectangles[rectIndex].points.push(newPoint);
-                        selectedPoint = newPoint;
-                        draggingPoint = newPoint;
-                        saveState();
+                        newPoint = { x, y: rectMidY, gray: newGrayValue, alpha: 255, id: pointIdCounter++ };
+                        tempPointAssociatedRectId = rectIndex;
                     }
+                }
+
+                if (newPoint) {
+                    temporaryPoint = newPoint;
+                    selectedPoint = newPoint;
+                    draggingPoint = newPoint;
+                    // DO NOT saveState() here.
                 }
             }
             updateControls();
@@ -551,9 +593,14 @@
             requestDraw();
         }
 
+        // --- MODIFIED handleMouseUp ---
         function handleMouseUp() {
             if (draggingPoint && didDrag) {
-                saveState();
+                if (temporaryPoint && draggingPoint.id === temporaryPoint.id) {
+                    commitTemporaryPoint();
+                } else {
+                    saveState();
+                }
             }
             draggingPoint = null;
             canvas.style.cursor = "crosshair";
@@ -563,37 +610,31 @@
             if (didDrag) return;
             const { x, y } = getMouseCoords(e);
             
+            const pointClicked = getPointAtCoords(x,y);
+
             if (currentMode === 'rect') {
                 const rectIndex = Math.floor(y / (h / RECT_COUNT));
                 selectedRectId = (rectangles[rectIndex]) ? rectIndex : null;
             }
             
-            selectedPoint = getPointAtCoords(x, y);
+            selectedPoint = pointClicked;
             
-            // --- MODIFICATION START ---
-            // If we clicked on an inactive placeholder point in rect mode, activate it.
             if (currentMode === 'rect' && selectedPoint && selectedPoint.alpha === 0) {
-                // Temporarily disable UI drawing to sample the pure gradient color
                 const originalDrawUI = window.drawUI;
                 window.drawUI = () => {};
                 needsRedraw = true;
                 draw();
 
-                // Sample the color at the point's location
                 const pixelData = ctx.getImageData(selectedPoint.x, selectedPoint.y, 1, 1).data;
                 const sampledGray = pixelData[0];
 
-                // Restore the UI drawing function
                 window.drawUI = originalDrawUI;
 
-                // Update the point's properties to make it active
-                selectedPoint.gray = 0;
-                selectedPoint.alpha = 0;
+                selectedPoint.gray = sampledGray;
+                selectedPoint.alpha = 255;
                 
-                // Save this change to history
                 saveState();
             }
-            // --- MODIFICATION END ---
 
             updateControls();
             requestDraw();
@@ -605,6 +646,9 @@
             const pointToDelete = getPointAtCoords(x, y);
 
             if (!pointToDelete) return;
+            
+            // Do not delete temporary points with right-click, they are discarded on next click.
+            if (temporaryPoint && pointToDelete.id === temporaryPoint.id) return;
 
             let pointsArray;
             if (currentMode === 'full') {
@@ -647,14 +691,12 @@
             canvas.width = w;
             canvas.height = h;
 
-            // Adjust global points
             const leftEndPoint = globalPoints.find(p => p.id === 0);
             if(leftEndPoint) leftEndPoint.y = h / 2;
 
             const rightEndPoint = globalPoints.find(p => p.id === 1);
             if(rightEndPoint) {
                 if (isEnlarging) {
-                    // Add a new point at the old boundary to preserve the gradient
                     const newIntermediatePoint = {
                         x: oldW,
                         y: rightEndPoint.y,
@@ -668,7 +710,6 @@
                 rightEndPoint.y = h / 2;
             }
 
-            // Adjust points in each rectangle
             const newRectHeight = h / RECT_COUNT;
             rectangles.forEach((rect, i) => {
                 const newY = i * newRectHeight;
@@ -703,16 +744,15 @@
         function handleSaveImage(e) {
             e.preventDefault();
             const originalDrawUI = window.drawUI;
-            window.drawUI = () => {}; // Temporarily disable UI drawing
+            window.drawUI = () => {}; 
             needsRedraw = true;
             draw();
             
             const image = canvas.toDataURL("image/png");
             
-            window.drawUI = originalDrawUI; // Restore UI drawing
+            window.drawUI = originalDrawUI; 
             requestDraw();
             
-            // Use a temporary link to trigger download
             const link = document.createElement('a');
             link.href = image;
             link.download = "gradient.png";
@@ -749,19 +789,32 @@
             };
         }
 
+        // --- MODIFIED getPointAtCoords ---
         function getPointAtCoords(x, y) {
+            if (temporaryPoint) {
+                const rectIndex = (currentMode === 'rect') ? Math.floor(y / (h / RECT_COUNT)) : null;
+                const isTempPointRelevant = (currentMode === 'full') || (currentMode === 'rect' && rectIndex === tempPointAssociatedRectId);
+                
+                if (isTempPointRelevant) {
+                    const dist = Math.sqrt((x - temporaryPoint.x) ** 2 + (y - temporaryPoint.y) ** 2);
+                    if (dist < HIT_RADIUS) {
+                        return temporaryPoint;
+                    }
+                }
+            }
+
             let pointsToSearch = [];
             if (currentMode === 'full') {
                 pointsToSearch = globalPoints;
             } else if (currentMode === 'rect') {
                 const rectIndex = Math.floor(y / (h / RECT_COUNT));
                 if (rectangles[rectIndex]) {
-                    selectedRectId = rectIndex;
+                    // Search all points in the hovered rect, not just the selected one.
                     pointsToSearch = rectangles[rectIndex].points;
                 }
             }
             
-            if (!pointsToSearch.length) return null;
+            if (!pointsToSearch || !pointsToSearch.length) return null;
 
             let closestPoint = null;
             let minDistance = HIT_RADIUS;
