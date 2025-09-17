@@ -15,11 +15,10 @@
             padding: 20px;
         }
 
-        /* New style for the main layout container */
         .main-layout {
             display: flex;
             align-items: flex-start;
-            gap: 20px; /* Space between canvas and controls */
+            gap: 20px;
         }
 
         .canvas-container {
@@ -61,7 +60,6 @@
         }
 
         .controls-container {
-            /* margin-top: 20px;  <-- This is no longer needed */
             margin-top: 0; 
             display: flex;
             gap: 20px;
@@ -130,6 +128,22 @@
             display: flex;
             align-items: center;
             gap: 10px;
+        }
+        
+        .side-label {
+            padding: 0 5px;
+            cursor: pointer;
+            transition: color 0.2s, transform 0.2s;
+            user-select: none;
+        }
+
+        .side-label:hover {
+            transform: scale(1.1);
+        }
+
+        .side-label.unlocked {
+            color: #33ccff;
+            font-weight: bold;
         }
     </style>
 </head>
@@ -217,9 +231,10 @@
         let isDraggingCanvas = false;
         let lastDragX = 0;
 
-        // --- NEW STATE FOR TEMPORARY POINTS ---
         let temporaryPoint = null;
         let tempPointAssociatedRectId = null; 
+
+        let unlockedRectId = null;
 
         // ---- State Management ----
         function saveState() {
@@ -250,7 +265,6 @@
             }
         }
 
-        // --- NEW HELPER FUNCTION TO COMMIT POINTS ---
         function commitTemporaryPoint() {
             if (!temporaryPoint) return;
 
@@ -365,17 +379,20 @@
             ctx.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
         }
         
-        // --- MODIFIED drawUI ---
         window.drawUI = function() {
-            let pointsToDraw = (currentMode === 'full') 
-                ? [...globalPoints] 
-                : (selectedRectId !== null ? [...rectangles[selectedRectId]?.points] : []);
-
-            // If a temporary point exists, add it to the list of points to be rendered.
+            let pointsToDraw;
+            if (currentMode === 'full') {
+                pointsToDraw = [...globalPoints];
+            } else if (currentMode === 'rect') {
+                pointsToDraw = unlockedRectId !== null ? [...rectangles[unlockedRectId]?.points] : [];
+            } else {
+                pointsToDraw = [];
+            }
+            
             if (temporaryPoint) {
                 if (currentMode === 'full') {
                     pointsToDraw.push(temporaryPoint);
-                } else if (currentMode === 'rect' && selectedRectId === tempPointAssociatedRectId) {
+                } else if (currentMode === 'rect' && unlockedRectId === tempPointAssociatedRectId) {
                     pointsToDraw.push(temporaryPoint);
                 }
             }
@@ -395,8 +412,8 @@
             pointsToDraw.forEach(p => {
                 const isSelected = selectedPoint && selectedPoint.id === p.id;
 
-                if (currentMode === 'rect' && selectedRectId !== null) {
-                    const rect = rectangles[selectedRectId];
+                if (currentMode === 'rect' && unlockedRectId !== null) {
+                    const rect = rectangles[unlockedRectId];
                     if (rect) {
                         ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
                         ctx.lineWidth = 1;
@@ -419,7 +436,37 @@
         }
 
         // ---- UI Updates ----
-        // --- MODIFIED updateControls ---
+        function handleLabelClick(e) {
+            if (temporaryPoint) {
+                temporaryPoint = null;
+                tempPointAssociatedRectId = null;
+            }
+
+            if (currentMode !== 'rect') return;
+            const id = parseInt(e.target.dataset.rectId);
+            
+            if (id === unlockedRectId) {
+                unlockedRectId = null;
+                selectedRectId = null;
+            } else {
+                unlockedRectId = id;
+                selectedRectId = id;
+            }
+
+            selectedPoint = null; 
+            updateControls();
+            updateLabelStyles();
+            requestDraw();
+        }
+
+        function updateLabelStyles() {
+            const allLabels = document.querySelectorAll('.side-label');
+            allLabels.forEach(label => {
+                const id = parseInt(label.dataset.rectId);
+                label.classList.toggle('unlocked', id === unlockedRectId);
+            });
+        }
+
         function updateControls() {
             const pointsToUse = (currentMode === 'full') 
                 ? globalPoints 
@@ -473,12 +520,20 @@
         }
 
         function setMode(mode, doSaveState = true) {
+            if (temporaryPoint) {
+                temporaryPoint = null;
+                tempPointAssociatedRectId = null;
+            }
+
             currentMode = mode;
             fullCanvasModeBtn.classList.toggle('active', mode === 'full');
             rectModeBtn.classList.toggle('active', mode === 'rect');
             
             selectedPoint = null;
             selectedRectId = null;
+            
+            unlockedRectId = null;
+            updateLabelStyles();
 
             if (doSaveState) saveState();
             
@@ -488,17 +543,27 @@
 
         function createSideLabels() {
             const rectHeight = h / RECT_COUNT;
-            const fragment = document.createDocumentFragment();
+            const leftFragment = document.createDocumentFragment();
+            const rightFragment = document.createDocumentFragment();
+
             for (let i = 0; i < RECT_COUNT; i++) {
                 const label = document.createElement('div');
                 label.style.height = `${rectHeight}px`;
                 label.style.lineHeight = `${rectHeight}px`;
                 label.style.fontSize = '12px';
                 label.textContent = i + 1;
-                fragment.appendChild(label);
+                label.className = 'side-label';
+                label.dataset.rectId = i;
+                label.addEventListener('click', handleLabelClick);
+                leftFragment.appendChild(label);
+                rightFragment.appendChild(label.cloneNode(true));
             }
-            leftLabels.replaceChildren(fragment.cloneNode(true));
-            rightLabels.replaceChildren(fragment);
+            leftLabels.replaceChildren(leftFragment);
+            
+            rightFragment.childNodes.forEach(node => node.addEventListener('click', handleLabelClick));
+            rightLabels.replaceChildren(rightFragment);
+
+            updateLabelStyles();
         }
 
         // ---- Event Handlers ----
@@ -527,7 +592,6 @@
             });
         }
         
-        // --- MODIFIED handleMouseDown ---
         function handleMouseDown(e) {
             if (e.button !== 0) return;
             const { x, y } = getMouseCoords(e);
@@ -554,6 +618,14 @@
                     tempPointAssociatedRectId = null;
                 } else if (currentMode === 'rect') {
                     const rectIndex = Math.floor(y / (h / RECT_COUNT));
+                    
+                    if (rectIndex !== unlockedRectId) {
+                        selectedPoint = null;
+                        requestDraw();
+                        updateControls();
+                        return; 
+                    }
+
                     if (rectangles[rectIndex]) {
                         selectedRectId = rectIndex;
                         const rectMidY = rectangles[rectIndex].y + rectangles[rectIndex].height / 2;
@@ -566,7 +638,6 @@
                     temporaryPoint = newPoint;
                     selectedPoint = newPoint;
                     draggingPoint = newPoint;
-                    // DO NOT saveState() here.
                 }
             }
             updateControls();
@@ -593,7 +664,6 @@
             requestDraw();
         }
 
-        // --- MODIFIED handleMouseUp ---
         function handleMouseUp() {
             if (draggingPoint && didDrag) {
                 if (temporaryPoint && draggingPoint.id === temporaryPoint.id) {
@@ -611,10 +681,12 @@
             const { x, y } = getMouseCoords(e);
             
             const pointClicked = getPointAtCoords(x,y);
-
-            if (currentMode === 'rect') {
-                const rectIndex = Math.floor(y / (h / RECT_COUNT));
-                selectedRectId = (rectangles[rectIndex]) ? rectIndex : null;
+            
+            if (currentMode === 'rect' && pointClicked) {
+                 const rectIndex = Math.floor(y / (h / RECT_COUNT));
+                 if (rectIndex === unlockedRectId) {
+                    selectedRectId = rectIndex;
+                 }
             }
             
             selectedPoint = pointClicked;
@@ -647,7 +719,6 @@
 
             if (!pointToDelete) return;
             
-            // Do not delete temporary points with right-click, they are discarded on next click.
             if (temporaryPoint && pointToDelete.id === temporaryPoint.id) return;
 
             let pointsArray;
@@ -762,7 +833,7 @@
         }
 
         function handleContainerDragStart(e) {
-            if (e.button === 1) { // Middle mouse button
+            if (e.button === 1) {
                 isDraggingCanvas = true;
                 lastDragX = e.clientX;
                 canvasContainer.style.cursor = 'grabbing';
@@ -789,7 +860,6 @@
             };
         }
 
-        // --- MODIFIED getPointAtCoords ---
         function getPointAtCoords(x, y) {
             if (temporaryPoint) {
                 const rectIndex = (currentMode === 'rect') ? Math.floor(y / (h / RECT_COUNT)) : null;
@@ -808,8 +878,7 @@
                 pointsToSearch = globalPoints;
             } else if (currentMode === 'rect') {
                 const rectIndex = Math.floor(y / (h / RECT_COUNT));
-                if (rectangles[rectIndex]) {
-                    // Search all points in the hovered rect, not just the selected one.
+                if (rectIndex === unlockedRectId && rectangles[rectIndex]) {
                     pointsToSearch = rectangles[rectIndex].points;
                 }
             }
