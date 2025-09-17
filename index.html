@@ -260,8 +260,8 @@
         function initializeGlobalPoints() {
             pointIdCounter = 0;
             globalPoints = [
-                { x: 0, y: h / 2, gray: 255, alpha: 255, id: pointIdCounter++ },
-                { x: w, y: h / 2, gray: 0, alpha: 255, id: pointIdCounter++ }
+                { x: 0, y: h / 2, gray: 0, alpha: 0, id: pointIdCounter++ },
+                { x: w, y: h / 2, gray: 0, alpha: 0, id: pointIdCounter++ }
             ];
             if (globalPoints.length > 0) {
                 selectedPoint = globalPoints[0];
@@ -279,7 +279,7 @@
                     y: rectY,
                     height: rectHeight,
                     points: [
-                        { x: 0, y: rectMidY, gray: 255, alpha: 0, id: pointIdCounter++ },
+                        { x: 0, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ },
                         { x: w, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ }
                     ]
                 });
@@ -508,7 +508,7 @@
 
                 if (currentMode === 'full') {
                     // Use the read color instead of a hardcoded gray value.
-                    const newPoint = { x, y, gray: newGrayValue, alpha: 255, id: pointIdCounter++ };
+                    const newPoint = { x, y, gray: 0, alpha: 0, id: pointIdCounter++ };
                     globalPoints.push(newPoint);
                     selectedPoint = newPoint;
                     draggingPoint = newPoint;
@@ -519,7 +519,7 @@
                         selectedRectId = rectIndex;
                         const rectMidY = rectangles[rectIndex].y + rectangles[rectIndex].height / 2;
                         // Use the read color instead of a hardcoded gray value.
-                        const newPoint = { x, y: rectMidY, gray: newGrayValue, alpha: 255, id: pointIdCounter++ };
+                        const newPoint = { x, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ };
                         rectangles[rectIndex].points.push(newPoint);
                         selectedPoint = newPoint;
                         draggingPoint = newPoint;
@@ -587,8 +587,8 @@
                 window.drawUI = originalDrawUI;
 
                 // Update the point's properties to make it active
-                selectedPoint.gray = sampledGray;
-                selectedPoint.alpha = 255;
+                selectedPoint.gray = 0;
+                selectedPoint.alpha = 0;
                 
                 // Save this change to history
                 saveState();
