@@ -28,6 +28,7 @@
             border: 2px solid #555;
             border-radius: 8px;
             cursor: crosshair;
+            position: relative;
         }
 
         canvas {
@@ -59,6 +60,14 @@
             background-color: #555;
         }
 
+        .video-mode-button {
+            background-color: #e74c3c !important;
+        }
+
+        .video-mode-button.active {
+            background-color: #c0392b !important;
+        }
+
         .controls-container {
             margin-top: 0; 
             display: flex;
@@ -70,6 +79,27 @@
             background: #333;
             padding: 10px;
             border-radius: 8px;
+        }
+
+        .video-controls-content {
+            background: #2c3e50;
+            border: 2px solid #e74c3c;
+        }
+
+        .video-download-button {
+            background-color: #8e44ad !important;
+            font-size: 16px;
+            width: 100%;
+            margin: 5px 0;
+        }
+
+        .video-download-button:hover {
+            background-color: #7d3c98 !important;
+        }
+
+        .video-download-button:disabled {
+            background-color: #555 !important;
+            cursor: not-allowed;
         }
 
         .point-control {
@@ -145,6 +175,68 @@
             color: #33ccff;
             font-weight: bold;
         }
+
+        .video-control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .video-control-row label {
+            min-width: 80px;
+            font-size: 14px;
+        }
+
+        .video-control-row input {
+            background: #34495e;
+            border: 1px solid #555;
+            color: white;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .video-play-button {
+            background-color: #27ae60 !important;
+            font-size: 18px;
+            min-width: 120px;
+        }
+
+        .video-play-button:hover {
+            background-color: #229954 !important;
+        }
+
+        .video-play-button.playing {
+            background-color: #e74c3c !important;
+        }
+
+        .video-play-button.playing:hover {
+            background-color: #c0392b !important;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #555;
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #e74c3c;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .time-display {
+            font-family: monospace;
+            font-size: 14px;
+            color: #ecf0f1;
+            text-align: center;
+            margin: 5px 0;
+        }
     </style>
 </head>
 
@@ -152,14 +244,15 @@
     <div class="mode-buttons">
         <button id="full-canvas-mode-btn" class="mode-button active">全畫布</button>
         <button id="rect-mode-btn" class="mode-button">矩形模式</button>
+        <button id="video-mode-btn" class="mode-button video-mode-button">影片模式</button>
     </div>
 
     <div class="canvas-size-controls">
         <label for="viewWidthInput">工作區寬度:</label>
         <input type="number" id="viewWidthInput" value="1280" min="100">
-        <label for="longWidthInput">卷軸長度:</label>
+        <label for="longWidthInput">總軸長度:</label>
         <input type="number" id="longWidthInput" value="1280" min="100">
-        <label for="heightInput">卷軸高度:</label>
+        <label for="heightInput">總軸高度:</label>
         <input type="number" id="heightInput" value="720" min="100">
         <button id="update-canvas-btn">更新畫布</button>
     </div>
@@ -180,9 +273,52 @@
         </div>
 
         <div class="controls-container">
-            <div class="controls" id="points-controls">
-                <h4>控制點屬性</h4>
-                <div id="controls"></div>
+            <div class="controls" id="controls-panel">
+                <!-- Normal mode: points controls -->
+                <div id="points-controls">
+                    <h4>控制點屬性</h4>
+                    <div id="controls"></div>
+                </div>
+
+                <!-- Video mode: video controls -->
+                <div class="video-controls-content" id="video-controls" style="display: none;">
+                    <h4>🎬 影片控制</h4>
+                    
+                    <div class="video-control-row">
+                        <label for="duration-input">總時長(秒):</label>
+                        <input type="number" id="duration-input" value="10" min="1" max="300">
+                    </div>
+                    
+                    <div class="video-control-row">
+                        <label for="fps-input">FPS:</label>
+                        <input type="number" id="fps-input" value="30" min="1" max="60">
+                    </div>
+
+                    <div class="video-control-row">
+                        <label>總幀數:</label>
+                        <span id="total-frames-display">300</span>
+                    </div>
+
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill"></div>
+                    </div>
+
+                    <div class="time-display" id="time-display">00:00 / 10:00</div>
+
+                    <div class="video-control-row">
+                        <button id="video-play-btn" class="video-play-button">▶ 播放</button>
+                        <button id="video-reset-btn" class="mode-button">重置</button>
+                    </div>
+
+                    <div class="video-control-row">
+                        <button id="video-download-btn" class="video-download-button">📥 下載影片</button>
+                    </div>
+
+                    <div class="video-control-row">
+                        <label for="current-frame-input">當前幀:</label>
+                        <input type="number" id="current-frame-input" value="0" min="0">
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -208,8 +344,21 @@
         const saveBtn = document.getElementById("save-btn");
         const fullCanvasModeBtn = document.getElementById("full-canvas-mode-btn");
         const rectModeBtn = document.getElementById("rect-mode-btn");
+        const videoModeBtn = document.getElementById("video-mode-btn");
         const leftLabels = document.getElementById('left-labels');
         const rightLabels = document.getElementById('right-labels');
+
+        // Video mode elements
+        const videoControls = document.getElementById("video-controls");
+        const durationInput = document.getElementById("duration-input");
+        const fpsInput = document.getElementById("fps-input");
+        const totalFramesDisplay = document.getElementById("total-frames-display");
+        const progressFill = document.getElementById("progress-fill");
+        const timeDisplay = document.getElementById("time-display");
+        const videoPlayBtn = document.getElementById("video-play-btn");
+        const videoResetBtn = document.getElementById("video-reset-btn");
+        const videoDownloadBtn = document.getElementById("video-download-btn");
+        const currentFrameInput = document.getElementById("current-frame-input");
 
         // ---- State ----
         let w = canvas.width;
@@ -235,6 +384,241 @@
         let tempPointAssociatedRectId = null; 
 
         let unlockedRectId = null;
+
+        // Video mode state
+        let videoState = {
+            isPlaying: false,
+            currentFrame: 0,
+            duration: 10,
+            fps: 30,
+            animationId: null,
+            startTime: null
+        };
+
+        // ---- Video Download Functions ----
+        async function downloadVideo() {
+            console.log('Download video started');
+            const totalFrames = videoState.duration * videoState.fps;
+            
+            // Disable the download button during processing
+            videoDownloadBtn.disabled = true;
+            videoDownloadBtn.textContent = "正在處理...";
+            
+            try {
+                // Create a canvas for recording at fixed 1280x720 resolution
+                const recordCanvas = document.createElement('canvas');
+                recordCanvas.width = 1280;
+                recordCanvas.height = 720;
+                const recordCtx = recordCanvas.getContext('2d');
+                
+                // Store original UI function
+                const originalDrawUI = window.drawUI;
+                window.drawUI = () => {}; // Disable UI during recording
+                
+                const frames = [];
+                
+                // Generate all frames
+                for (let frame = 0; frame < totalFrames; frame++) {
+                    // Update progress
+                    videoDownloadBtn.textContent = `處理中... ${Math.round((frame / totalFrames) * 100)}%`;
+                    
+                    // Calculate scroll position for this frame
+                    const scrollProgress = frame / Math.max(1, totalFrames - 1);
+                    const maxScroll = Math.max(0, w - 1280);
+                    const scrollPosition = scrollProgress * maxScroll;
+                    
+                    // Clear record canvas
+                    recordCtx.clearRect(0, 0, 1280, 720);
+                    
+                    // Save context and translate for scroll effect
+                    recordCtx.save();
+                    recordCtx.translate(-scrollPosition, 0);
+                    
+                    // Draw global gradient to record canvas
+                    drawNativeGradientToCanvas(recordCtx, globalPoints, { x: 0, y: 0, w, h });
+                    
+                    // Draw rectangle gradients to record canvas
+                    rectangles.forEach(rect => {
+                        const hasEffect = rect.points.some(p => p.alpha > 0);
+                        if (rect.points.length > 2 || hasEffect) {
+                            drawNativeGradientToCanvas(recordCtx, rect.points, { x: 0, y: rect.y, w, h: rect.height });
+                        }
+                    });
+                    
+                    recordCtx.restore();
+                    
+                    // Convert to blob and store
+                    const frameData = await new Promise(resolve => {
+                        recordCanvas.toBlob(resolve, 'image/png');
+                    });
+                    frames.push(frameData);
+                    
+                    // Allow UI to update
+                    await new Promise(resolve => setTimeout(resolve, 1));
+                }
+                
+                // Restore UI function
+                window.drawUI = originalDrawUI;
+                requestDraw();
+                
+                // Download frames
+                videoDownloadBtn.textContent = "下載幀檔案...";
+                await downloadFramesAsZip(frames);
+                
+            } catch (error) {
+                console.error('Video download error:', error);
+                alert('影片下載失敗: ' + error.message);
+            } finally {
+                // Re-enable button
+                videoDownloadBtn.disabled = false;
+                videoDownloadBtn.textContent = "📥 下載影片";
+            }
+        }
+        
+        function drawNativeGradientToCanvas(context, points, bounds) {
+            if (points.length < 2) return;
+
+            const sortedByX = [...points].sort((a, b) => a.x - b.x);
+            const pStart = sortedByX[0];
+            const pEnd = sortedByX[sortedByX.length - 1];
+
+            const dx = pEnd.x - pStart.x;
+            const dy = pEnd.y - pStart.y;
+            const lenSq = dx * dx + dy * dy;
+
+            if (lenSq === 0) return;
+
+            const gradient = context.createLinearGradient(pStart.x, pStart.y, pEnd.x, pEnd.y);
+            
+            const projectedPoints = points.map(p => {
+                const t = ((p.x - pStart.x) * dx + (p.y - pStart.y) * dy) / lenSq;
+                return { ...p, t: Math.max(0, Math.min(1, t)) };
+            }).sort((a, b) => a.t - b.t);
+
+            projectedPoints.forEach(p => {
+                gradient.addColorStop(p.t, `rgba(${p.gray}, ${p.gray}, ${p.gray}, ${p.alpha / 255})`);
+            });
+            
+            context.fillStyle = gradient;
+            context.fillRect(bounds.x, bounds.y, bounds.w, bounds.h);
+        }
+        
+        async function downloadFramesAsZip(frames) {
+            const totalFrames = frames.length;
+            const padLength = totalFrames.toString().length;
+            
+            // Download each frame individually
+            for (let i = 0; i < frames.length; i++) {
+                const frameNumber = (i + 1).toString().padStart(padLength, '0');
+                const url = URL.createObjectURL(frames[i]);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `frame_${frameNumber}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                // Small delay between downloads to avoid browser issues
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            alert(`影片已下載為 ${totalFrames} 個 1280x720 PNG幀檔案。\n\n使用 FFmpeg 轉換為影片：\nffmpeg -framerate ${videoState.fps} -i frame_%0${padLength}d.png -c:v libx264 -pix_fmt yuv420p -s 1280x720 output.mp4`);
+        }
+
+        // ---- Video Mode Functions ----
+        function updateVideoParams() {
+            videoState.duration = parseInt(durationInput.value);
+            videoState.fps = parseInt(fpsInput.value);
+            const totalFrames = videoState.duration * videoState.fps;
+            totalFramesDisplay.textContent = totalFrames;
+            currentFrameInput.max = totalFrames - 1;
+            updateTimeDisplay();
+        }
+
+        function updateTimeDisplay() {
+            const currentTime = videoState.currentFrame / videoState.fps;
+            const totalTime = videoState.duration;
+            const current = formatTime(currentTime);
+            const total = formatTime(totalTime);
+            timeDisplay.textContent = `${current} / ${total}`;
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function updateVideoProgress() {
+            const totalFrames = videoState.duration * videoState.fps;
+            const progress = (videoState.currentFrame / Math.max(1, totalFrames - 1)) * 100;
+            progressFill.style.width = `${Math.min(100, progress)}%`;
+            currentFrameInput.value = videoState.currentFrame;
+            updateTimeDisplay();
+            
+            // Calculate scroll position based on current frame
+            const totalFrames_calc = videoState.duration * videoState.fps;
+            const scrollProgress = videoState.currentFrame / Math.max(1, totalFrames_calc - 1);
+            const maxScroll = Math.max(0, w - 1280);
+            const scrollPosition = scrollProgress * maxScroll;
+            canvasContainer.scrollLeft = scrollPosition;
+        }
+
+        function playVideo() {
+            if (videoState.isPlaying) {
+                stopVideo();
+                return;
+            }
+
+            videoState.isPlaying = true;
+            videoState.startTime = performance.now();
+            videoPlayBtn.textContent = "⏸ 暫停";
+            videoPlayBtn.classList.add("playing");
+
+            function animate(currentTime) {
+                if (!videoState.isPlaying) return;
+
+                const elapsed = (currentTime - videoState.startTime) / 1000;
+                videoState.currentFrame = Math.floor(elapsed * videoState.fps);
+                
+                const totalFrames = videoState.duration * videoState.fps;
+                
+                if (videoState.currentFrame >= totalFrames) {
+                    videoState.currentFrame = totalFrames - 1;
+                    stopVideo();
+                    return;
+                }
+
+                updateVideoProgress();
+                videoState.animationId = requestAnimationFrame(animate);
+            }
+
+            videoState.animationId = requestAnimationFrame(animate);
+        }
+
+        function stopVideo() {
+            videoState.isPlaying = false;
+            if (videoState.animationId) {
+                cancelAnimationFrame(videoState.animationId);
+                videoState.animationId = null;
+            }
+            videoPlayBtn.textContent = "▶ 播放";
+            videoPlayBtn.classList.remove("playing");
+        }
+
+        function resetVideo() {
+            stopVideo();
+            videoState.currentFrame = 0;
+            canvasContainer.scrollLeft = 0;
+            updateVideoProgress();
+        }
+
+        function setVideoFrame(frame) {
+            const totalFrames = videoState.duration * videoState.fps;
+            videoState.currentFrame = Math.max(0, Math.min(frame, totalFrames - 1));
+            updateVideoProgress();
+        }
 
         // ---- State Management ----
         function saveState() {
@@ -289,6 +673,7 @@
             createSideLabels();
             setupEventListeners();
             setMode('full', false);
+            updateVideoParams();
             saveState();
             draw();
         }
@@ -380,6 +765,9 @@
         }
         
         window.drawUI = function() {
+            // In video mode, don't draw UI elements to keep clean output
+            if (currentMode === 'video') return;
+
             let pointsToDraw;
             if (currentMode === 'full') {
                 pointsToDraw = [...globalPoints];
@@ -398,7 +786,7 @@
             }
             
             if (pointsToDraw.length > 1) {
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 const sorted = [...pointsToDraw].sort((a, b) => a.x - b.x);
@@ -468,6 +856,11 @@
         }
 
         function updateControls() {
+            if (currentMode === 'video') {
+                controlsDiv.innerHTML = '<p>影片模式：使用右側影片控制面板</p>';
+                return;
+            }
+
             const pointsToUse = (currentMode === 'full') 
                 ? globalPoints 
                 : (selectedRectId !== null ? rectangles[selectedRectId]?.points : null);
@@ -525,15 +918,42 @@
                 tempPointAssociatedRectId = null;
             }
 
+            // Stop video if switching away from video mode
+            if (currentMode === 'video' && mode !== 'video') {
+                stopVideo();
+            }
+
             currentMode = mode;
             fullCanvasModeBtn.classList.toggle('active', mode === 'full');
             rectModeBtn.classList.toggle('active', mode === 'rect');
+            videoModeBtn.classList.toggle('active', mode === 'video');
             
             selectedPoint = null;
             selectedRectId = null;
             
             unlockedRectId = null;
             updateLabelStyles();
+
+            // Show/hide appropriate controls
+            const pointsControls = document.getElementById('points-controls');
+            const videoControls = document.getElementById('video-controls');
+            
+            if (mode === 'video') {
+                pointsControls.style.display = 'none';
+                videoControls.style.display = 'block';
+            } else {
+                pointsControls.style.display = 'block';
+                videoControls.style.display = 'none';
+            }
+            
+            // Disable canvas interaction in video mode
+            if (mode === 'video') {
+                canvas.style.pointerEvents = 'none';
+                canvasContainer.style.cursor = 'default';
+            } else {
+                canvas.style.pointerEvents = 'auto';
+                canvasContainer.style.cursor = 'crosshair';
+            }
 
             if (doSaveState) saveState();
             
@@ -581,18 +1001,41 @@
             
             fullCanvasModeBtn.addEventListener("click", () => setMode('full'));
             rectModeBtn.addEventListener("click", () => setMode('rect'));
+            videoModeBtn.addEventListener("click", () => setMode('video'));
             updateCanvasBtn.addEventListener("click", handleUpdateCanvas);
             saveBtn.addEventListener("click", handleSaveImage);
+            
+            // Video mode event listeners
+            durationInput.addEventListener('input', updateVideoParams);
+            fpsInput.addEventListener('input', updateVideoParams);
+            videoPlayBtn.addEventListener('click', playVideo);
+            videoResetBtn.addEventListener('click', resetVideo);
+            videoDownloadBtn.addEventListener('click', downloadVideo);
+            currentFrameInput.addEventListener('input', (e) => {
+                setVideoFrame(parseInt(e.target.value));
+            });
             
             window.addEventListener('keydown', e => {
                 if (e.ctrlKey && e.key === 'z') {
                     e.preventDefault();
                     undo();
                 }
+                
+                // Video mode keyboard shortcuts
+                if (currentMode === 'video') {
+                    if (e.code === 'Space') {
+                        e.preventDefault();
+                        playVideo();
+                    } else if (e.key === 'r') {
+                        e.preventDefault();
+                        resetVideo();
+                    }
+                }
             });
         }
         
         function handleMouseDown(e) {
+            if (currentMode === 'video') return;
             if (e.button !== 0) return;
             const { x, y } = getMouseCoords(e);
             didDrag = false;
@@ -645,6 +1088,7 @@
         }
 
         function handleMouseMove(e) {
+            if (currentMode === 'video') return;
             if (!draggingPoint) return;
             didDrag = true;
             const { x, y } = getMouseCoords(e);
@@ -665,6 +1109,7 @@
         }
 
         function handleMouseUp() {
+            if (currentMode === 'video') return;
             if (draggingPoint && didDrag) {
                 if (temporaryPoint && draggingPoint.id === temporaryPoint.id) {
                     commitTemporaryPoint();
@@ -677,6 +1122,7 @@
         }
         
         function handleClick(e) {
+            if (currentMode === 'video') return;
             if (didDrag) return;
             const { x, y } = getMouseCoords(e);
             
@@ -713,6 +1159,7 @@
         }
         
         function handleContextMenu(e) {
+            if (currentMode === 'video') return;
             e.preventDefault();
             const { x, y } = getMouseCoords(e);
             const pointToDelete = getPointAtCoords(x, y);
@@ -833,6 +1280,7 @@
         }
 
         function handleContainerDragStart(e) {
+            if (currentMode === 'video') return;
             if (e.button === 1) {
                 isDraggingCanvas = true;
                 lastDragX = e.clientX;
@@ -841,12 +1289,14 @@
             }
         }
         function handleContainerDrag(e) {
+            if (currentMode === 'video') return;
             if (!isDraggingCanvas) return;
             const dx = e.clientX - lastDragX;
             canvasContainer.scrollLeft -= dx;
             lastDragX = e.clientX;
         }
         function handleContainerDragEnd() {
+            if (currentMode === 'video') return;
             isDraggingCanvas = false;
             canvasContainer.style.cursor = 'crosshair';
         }
