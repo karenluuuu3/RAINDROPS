@@ -118,6 +118,18 @@
             gap: 10px;
         }
 
+        .point-control-row span:first-child {
+            min-width: 60px;
+        }
+
+        .value-display {
+            min-width: 40px;
+            text-align: right;
+            font-family: monospace;
+            font-weight: bold;
+            color: #33ccff;
+            font-size: 20px;
+        }
         .point-label {
             min-width: 60px;
         }
@@ -857,7 +869,7 @@
 
         function updateControls() {
             if (currentMode === 'video') {
-                controlsDiv.innerHTML = '<p>影片模式：使用右側影片控制面板</p>';
+                controlsDiv.innerHTML = '<p>影片模式:使用右側影片控制面板</p>';
                 return;
             }
 
@@ -883,21 +895,37 @@
                 ? `區域 ${selectedRectId + 1} 點 ${p.id}`
                 : `點 ${p.id}`;
 
+            // 將透明度轉換為 0~1 的格式顯示
+            const alphaDisplay = (p.alpha / 255).toFixed(2);
+
             controlWrapper.innerHTML = `
                 <span class="point-label">${labelText} (${p.x.toFixed(0)},${p.y.toFixed(0)})</span>
                 <div class="point-control-row">
                     <span>灰度:</span>
                     <input type="range" min="0" max="255" value="${p.gray}" data-prop="gray">
+                    <span class="value-display" data-value="gray">${p.gray}</span>
                 </div>
                 <div class="point-control-row">
                     <span>透明度:</span>
                     <input type="range" min="0" max="255" value="${p.alpha}" data-prop="alpha">
+                    <span class="value-display" data-value="alpha">${alphaDisplay}</span>
                 </div>
             `;
 
             controlWrapper.querySelectorAll('input[type="range"]').forEach(slider => {
                 slider.oninput = () => {
-                    p[slider.dataset.prop] = parseInt(slider.value);
+                    const prop = slider.dataset.prop;
+                    p[prop] = parseInt(slider.value);
+                    const valueSpan = controlWrapper.querySelector(`span[data-value="${prop}"]`);
+                    if (valueSpan) {
+                        if (prop === 'alpha') {
+                            // 透明度顯示為 0~1，需要除以 255
+                            valueSpan.textContent = (parseInt(slider.value) / 255).toFixed(2);
+                        } else {
+                            // 灰度顯示原始值
+                            valueSpan.textContent = slider.value;
+                        }
+                    }
                     requestDraw();
                 };
                 slider.onchange = () => {
