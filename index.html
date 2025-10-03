@@ -263,7 +263,7 @@
         <label for="viewWidthInput">工作區寬度:</label>
         <input type="number" id="viewWidthInput" value="1280" min="100">
         <label for="longWidthInput">總軸長度:</label>
-        <input type="number" id="longWidthInput" value="1280" min="100">
+        <input type="number" id="longWidthInput" value="4000" min="100">
         <label for="heightInput">總軸高度:</label>
         <input type="number" id="heightInput" value="720" min="100">
         <button id="update-canvas-btn">更新畫布</button>
@@ -680,6 +680,11 @@
 
         // ---- Initialization ----
         function initialize() {
+            w = 4000;
+            h = 720;
+            canvas.width = w;
+            canvas.height = h;
+
             initializeGlobalPoints();
             initializeRectangles();
             createSideLabels();
@@ -701,20 +706,57 @@
             }
         }
 
+        function getDefaultRectanglePoints(rectIndex, rectMidY, canvasWidth) {
+            // 返回該矩形的預設控制點陣列，如果沒有預設則返回 null
+            const defaults = {
+/*
+                24: [  // 第 25 個矩形
+                    { x: canvasWidth * 0.25, y: rectMidY, gray: 128, alpha: 255 },
+                    { x: canvasWidth * 0.5, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.75, y: rectMidY, gray: 64, alpha: 255 }
+                ],
+                10: [  // 第 11 個矩形（範例）
+                    { x: canvasWidth * 0.3, y: rectMidY, gray: 200, alpha: 200 }
+                ]
+                // 可以繼續添加更多矩形的預設值
+                */
+
+            };
+            
+            return defaults[rectIndex] || null;
+        }
+
         function initializeRectangles() {
             rectangles = [];
             const rectHeight = h / RECT_COUNT;
             for (let i = 0; i < RECT_COUNT; i++) {
                 const rectY = i * rectHeight;
                 const rectMidY = rectY + rectHeight / 2;
+
+                const points = [
+                    { x: 0, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ },
+                    { x: w, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ }
+                ];
+
+                // 檢查是否有預設控制點
+                const defaultPoints = getDefaultRectanglePoints(i, rectMidY, w);
+                if (defaultPoints) {
+                    defaultPoints.forEach(pt => {
+                        points.push({
+                            x: pt.x,
+                            y: pt.y,
+                            gray: pt.gray,
+                            alpha: pt.alpha,
+                            id: pointIdCounter++
+                        });
+                    });
+                }
+
                 rectangles.push({
                     id: i,
                     y: rectY,
                     height: rectHeight,
-                    points: [
-                        { x: 0, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ },
-                        { x: w, y: rectMidY, gray: 0, alpha: 0, id: pointIdCounter++ }
-                    ]
+                    points: points
                 });
             }
         }
