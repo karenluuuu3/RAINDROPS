@@ -709,17 +709,357 @@
         function getDefaultRectanglePoints(rectIndex, rectMidY, canvasWidth) {
             // 返回該矩形的預設控制點陣列，如果沒有預設則返回 null
             const defaults = {
-/*
-                24: [  // 第 25 個矩形
-                    { x: canvasWidth * 0.25, y: rectMidY, gray: 128, alpha: 255 },
-                    { x: canvasWidth * 0.5, y: rectMidY, gray: 255, alpha: 255 },
-                    { x: canvasWidth * 0.75, y: rectMidY, gray: 64, alpha: 255 }
+
+                2: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
                 ],
-                10: [  // 第 11 個矩形（範例）
-                    { x: canvasWidth * 0.3, y: rectMidY, gray: 200, alpha: 200 }
-                ]
-                // 可以繼續添加更多矩形的預設值
-                */
+
+                4: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                7: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                10: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                11: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                //
+
+                18: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                19: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                21: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                22: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                24: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                25: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                29: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                //
+
+                6: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                12: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                14: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                0: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                5: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                1: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                3: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                8: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                13: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                15: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                16: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                17: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                20: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                26: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                //
+                23: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 100, alpha: 255 }
+                ],
+
+                27: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 100, alpha: 255 }
+                ],
+
+                31: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 100, alpha: 255 }
+                ],
+
+                //
+
+                41: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 100, alpha: 255 }
+                ],
+
+                40: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                42: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 100, alpha: 255 }
+                ],
+
+                46: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                49: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                45: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+                48: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 50, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 150, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 255, alpha: 255 }
+                ],
+
+
+                //
+
+
+                44: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                43: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                47: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                //
+
+
+                34: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                37: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                40: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 200, alpha: 255 }
+                ],
+
+                35: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 60, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                36: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 60, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                38: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 60, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 150, alpha: 255 }
+                ],
+
+                31: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                33: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 255, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
+                39: [
+                    { x: canvasWidth * 0.2, y: rectMidY, gray: 200, alpha: 255 },
+                    { x: canvasWidth * 0.4, y: rectMidY, gray: 100, alpha: 255 },
+                    { x: canvasWidth * 0.6, y: rectMidY, gray: 80, alpha: 255 },
+                    { x: canvasWidth * 0.8, y: rectMidY, gray: 50, alpha: 255 }
+                ],
+
 
             };
             
